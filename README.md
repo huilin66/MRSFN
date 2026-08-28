@@ -59,6 +59,35 @@ val_dataset:
 
 The `.env` file is ignored by git so private dataset paths are not published.
 
+## Geographic-Leakage Experiment (City-Level Split)
+
+A reviewer concern was that the default random patch split can leak geography
+between train/val (patches from the same full scene land in both sets). To
+evaluate this, a **geographically disjoint** split can be built with
+
+```bash
+python tools/build_city_split_dataset.py --split train_B_val_W
+```
+
+The scene root is taken automatically from `C2SEG_BW_ROOT` in `.env` (the
+full-scene TIFFs live in `.../C2Seg/src/tif_BW`), so no path needs to be
+passed. `train_B_val_W` crops training patches from the **Beijing** full scene
+and validation patches from the **Wuhan** full scene; swap the direction with
+`--split train_W_val_B`. Output defaults to `data/C2Seg_BW_city_<split>` and
+uses the same `msisar/hsi/lbl` layout + `train.txt` / `val.txt` expected by
+`RS_MD3B`, rescaling full-scene HSI (0-1 reflectance) by 10000 to the patch DN
+range.
+
+Then point a config at it:
+
+```bash
+C2SEG_BW_CITY_ROOT=<abs/path>       # add to .env
+python PaddleCD/train.py \
+  --config PaddleCD/c2seg_config/cxup_4b_BW_PMRG_v2_lossV2_city.yml \
+  --save_dir output/city/... \
+  --do_eval
+```
+
 ## Training
 
 Run training from the repository root:
