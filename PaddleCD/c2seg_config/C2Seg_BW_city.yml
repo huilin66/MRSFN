@@ -13,3 +13,13 @@ train_dataset:
 val_dataset:
   dataset_root: ${C2SEG_BW_CITY_ROOT}/val
   val_path:  ${C2SEG_BW_CITY_ROOT}/val.txt
+
+# The city split has 1,855 training patches (115 full batches at batch_size 16),
+# versus 6,426 patches (401 full batches) in ordinary BW.  Keep approximately
+# 100 training epochs while retaining the ordinary BW learning rate and decay
+# ratio; these values are overridden only for the city-split experiment.
+iters: 11500
+save_interval: 230
+
+lr_scheduler:
+  step_size: 1450

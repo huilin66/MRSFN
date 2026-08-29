@@ -1,7 +1,7 @@
 # MRSN / MRSFN 项目交接文档
 
-> 文档版本：v2.8
-> 更新时间：2026-08-29  
+> 文档版本：v2.9
+> 更新时间：2026-08-30
 > 项目目录：`E:\repository\MRSN`  
 > 目的：帮助后续工作快速理解项目、复现实验并继续处理论文实验。
 
@@ -11,7 +11,7 @@
 - Origin Mode: `handoff-update`
 - Origin Date: `2026-08-29`
 - Verification Status: `UNVERIFIED`（本文档记录实验计划与当前仓库状态；下方实验尚未全部执行）
-- Version Label: `handoff_v2.8`
+- Version Label: `handoff_v2.9`
 - Upstream Dependencies: `E:\repository\academic research\mrsn\ieee_version\experiment_handoff.md`、当前仓库代码与 `.env`
 
 ## 1. 项目背景
@@ -117,6 +117,10 @@ ConvNeXt-Small 和 ConvNeXt-Base 替换现有 1B 的 ConvNeXt-Tiny，使其参�
 - seed：1,919,810；
 - 普通 BW 基线损失：`CrossEntropyLoss_Smooth + 0.5 * DiceLoss`；EXP-03 的 loss 变体使用
   `Poly1Loss_Smooth + 0.5 * DiceLoss`。
+- 城市级 EXP-01 使用 `C2Seg_BW_city.yml` 的独立训练预算：`iters=11500`、
+  `save_interval=230`、`StepDecay step_size=1450`；`batch_size=16`、初始学习率
+  `0.0002`、`gamma=0.5` 和其他训练设置保持普通 BW 不变，使 1,855 个训练 patch
+  对应约 100 个完整 batch epoch。
 
 ## 4. 常用运行方式
 
