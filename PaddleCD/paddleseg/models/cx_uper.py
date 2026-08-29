@@ -16,14 +16,24 @@ class CX_Uper(nn.Layer):
                  backb,
                  hsi_chs=242,
                  dropout_rate=0.0,
+                 pretrained=True,
                  ):
         super(CX_Uper, self).__init__()
         if backb == 'convnext_tiny':
-            self.backbone = convnext.convnext_tiny(in_chans=hsi_chs + 6)
+            self.backbone = convnext.convnext_tiny(
+                pretrained=pretrained, in_chans=hsi_chs + 6)
         elif backb == 'convnext_small':
-            self.backbone = convnext.convnext_small(in_chans=hsi_chs + 6)
+            self.backbone = convnext.convnext_small(
+                pretrained=pretrained, in_chans=hsi_chs + 6)
+        elif backb == 'convnext_base':
+            self.backbone = convnext.convnext_base(
+                pretrained=pretrained, in_chans=hsi_chs + 6)
+        elif backb == 'convnext_large':
+            self.backbone = convnext.convnext_large(
+                pretrained=pretrained, in_chans=hsi_chs + 6)
         else:
-            self.backbone = convnext.convnext_base(in_chans=hsi_chs + 6)
+            self.backbone = convnext.convnext_base(
+                pretrained=pretrained, in_chans=hsi_chs + 6)
 
         self.decode_head = UPerHead(self.backbone.dims[:3], num_classes=num_classes)
         self.drop = nn.Dropout2D(dropout_rate)

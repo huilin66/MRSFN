@@ -1,0 +1,11 @@
+_base_: 'C2Seg_BW.yml'
+
+# EXP-02 supplemental run: retain the 1B single-backbone design while using
+# ConvNeXt-Small to approach the parameter scale of the existing 2B-Tiny run.
+model:
+  type: CX_Uper
+  backb: convnext_small
+  in_channels: 3
+  num_classes: 14
+  dropout_rate: 0
+  hsi_chs: 116

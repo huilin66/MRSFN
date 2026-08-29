@@ -1,6 +1,6 @@
 # MRSN / MRSFN 项目交接文档
 
-> 文档版本：v2.0
+> 文档版本：v2.4
 > 更新时间：2026-08-29  
 > 项目目录：`E:\repository\MRSN`  
 > 目的：帮助后续工作快速理解项目、复现实验并继续处理论文实验。
@@ -11,7 +11,7 @@
 - Origin Mode: `handoff-update`
 - Origin Date: `2026-08-29`
 - Verification Status: `UNVERIFIED`（本文档记录实验计划与当前仓库状态；下方实验尚未全部执行）
-- Version Label: `handoff_v2.0`
+- Version Label: `handoff_v2.4`
 - Upstream Dependencies: `E:\repository\academic research\mrsn\ieee_version\experiment_handoff.md`、当前仓库代码与 `.env`
 
 ## 1. 项目背景
@@ -100,6 +100,11 @@ msi/sample.tiff sar/sample.tiff lbl/sample.tiff
 
 4B 模型使用四个 ConvNeXt backbone，输入通道分别为 3、3、2、116；低层特征融合后进入 UPerHead。PMRG V2 在多个 backbone stage 上预测每个模态的像素级可靠性门控，并通过 baseline-preserving 的方式调节模态特征。
 
+EXP-02 基于现有普通 BW 实验补充 1B 模型的 backbone size：用
+ConvNeXt-Small 和 ConvNeXt-Base 替换现有 1B 的 ConvNeXt-Tiny，使其参数量
+分别接近现有 2B-Tiny 和 3B-Tiny，并为 4B-Tiny 提供更接近的标准 backbone
+参照。该实验不使用 EXP-01 的城市划分。
+
 ### 3.4 损失与训练
 
 常用训练配置：
@@ -138,11 +143,22 @@ python tools/build_city_split_dataset.py --split train_B_val_W
 
 完整场景推理入口是 `tools/infer_full_scene.py`；该脚本已经包含 HSI 与 MSI/SAR 不同空间分辨率时的坐标映射和 resize 逻辑。
 
+实验脚本入口：
+
+```bash
+bash exp_add.sh
+bash scripts/exp01_city_all_models.sh
+bash scripts/exp02_capacity_control.sh
+```
+
+`exp_add.sh` 只负责按顺序调度已经准备好的实验；每个实验的训练、推理和
+参数集中在 `scripts/` 下对应的独立脚本中。
+
 ## 5. 当前仓库状态
 
 截至 2026-08-29：
 
-- 当前分支为 `re`，HEAD 为 `ff014fc`，工作区存在未提交修改：`.gitignore`、`PaddleCD/c2seg_config/C2Seg_BW_city.yml`、`README.md` 和 `handoff.md`；这些修改继续保留，后续操作前需先核对归属。
+- 当前分支为 `re`，HEAD 为 `ff014fc`，工作区存在未提交修改和新增实验文件，包括 `.gitignore`、`PaddleCD/c2seg_config/C2Seg_BW_city.yml`、`PaddleCD/paddleseg/models/cx_uper.py`、`README.md`、`handoff.md`、`exp_add.sh`、`scripts/` 以及 EXP-02 配置；这些修改继续保留，后续操作前需先核对归属。
 - `output/` 中已有多种 baseline、MRSN、4B、PMRG 和损失变体的 checkpoint。
 - 当前 MRSFN/PMRG V2 验证日志记录的代表性结果为：mIoU `0.8694`、F1 `0.9287`、ACC `0.9658`、Kappa `0.9539`、参数量约 `116.51M`、FLOPs 约 `94.18G`。原始配置、日志和 checkpoint 中的技术名称仍可能使用 `MBFM` 或 `cxup_*`，应按上下文解释。
 - 本地城市级数据目录 `data/C2Seg_BW_city_train_B_val_W` 包含北京训练 1,855 个 patch、武汉验证 850 个 patch。
@@ -177,7 +193,7 @@ label:  (256, 256)
 
 - `train.py` 的默认 config 是旧的 Linux 绝对路径，运行时应始终显式传入 `--config`。
 - `export.py` 使用单输入 3 通道 `InputSpec`，而多模态模型实际接收 6 通道和 116 通道两路输入；导出功能需要针对自定义模型重新验证。
-- 当前代码中不支持的 backbone 名称会回退到 ConvNeXt-Base；执行 EXP-02 前应先显式增加 `convnext_large` 路由。仅做 4B-Large 对比只能说明规模敏感性，不能作为容量控制实验。
+- `CX_Uper` 现在已显式支持 `convnext_base` 和 `convnext_large`，同时保留未知名称回退到 ConvNeXt-Base 的兼容行为。仅做 4B-Large 对比只能说明规模敏感性，不能作为容量控制实验。
 - PMRG 扰动实验应在 stream splitting 之后做 branch-level masking；直接遮蔽原始 MSI 应标记为 sensor-level MSI missing，因为 RGB 与 NIRGB 存在通道重叠。
 - 当前没有自动化测试，修改数据读取、模型输入或配置注册逻辑后，应至少执行 dataset sample shape 检查、model dry-run 和一次小规模验证。
 
@@ -187,12 +203,23 @@ label:  (256, 256)
 
 1. 准备 Paddle GPU 运行环境，使用 `exp_add.sh` 按同一城市划分训练全部 15 个 BW 模型/变体；
 2. 使用全部城市划分 checkpoint 完成下方 EXP-01 的完整场景/地理独立评估；
-3. 完成下方 EXP-02 的容量控制分支对比；
+3. 按现有普通 BW 实验协议完成下方 EXP-02 的 1B-Small 和 1B-Base 补充实验；
 4. 完成下方 EXP-03 的重复运行与不确定性统计；
 5. 完成下方 EXP-04 的 PMRG 门控可视化和模态扰动实验；
 6. 完成下方 EXP-05 的 CMX-adapted 两流基线；
 7. 汇总 checkpoint、指标、推理参数、数据来源和实验 provenance，形成论文可用表格；
 8. 最后再执行 REPO-01 的公共文档命名对齐；该项当前仅作为交接计划，不在本次更新中改动公共代码/文档。
+
+### EXP-02 当前准备状态
+
+- `cxup_1b_BW_small.yml`：保留 1B 单 backbone 结构，将 backbone 替换为 ConvNeXt-Small；
+- `cxup_1b_BW_base.yml`：保留 1B 单 backbone 结构，将 backbone 替换为 ConvNeXt-Base；
+- 两组配置继承普通 `C2Seg_BW.yml`，不使用 EXP-01 的 `C2Seg_BW_city.yml` 或城市划分数据；
+- 现有普通 BW 日志中的参考参数量为：1B-Tiny `30.01M`、2B-Tiny `58.50M`、3B-Tiny `87.00M`、4B-Tiny `115.49M`；在 `mrsn` 环境中实测新增配置为：1B-Small `51.65M`（可训练 `51.64M`），1B-Base `90.05M`（可训练 `90.04M`）；新配置的 FLOPs/FPS 仍以运行日志为准；
+- 上述参数统计使用 Paddle 3.3.1 在 CPU 上构建模型，并临时关闭预训练权重加载；该操作不改变参数数量，正式训练仍按配置的默认初始化策略执行；
+- `scripts/exp02_capacity_control.sh` 使用现有实验的 seed `1919810`，依次运行两个补充配置；
+- `exp_add.sh` 仅作为总调度器，每个实验占一行命令；EXP-01 和 EXP-02 均可从 `scripts/` 独立执行；
+- 该实验目前是 `prepared`，尚未在兼容的 Paddle GPU 环境中执行。
 
 ### 源实验交接内容（原文更新版）
 
@@ -211,9 +238,9 @@ label:  (256, 256)
 #### EXP-02 — Capacity-controlled branch comparison
 
 - **Goal:** Separate the effect of modality-specific branches from model capacity.
-- **Protocol:** Under the same BW split, loss, crop, training budget, and seeds, compare the current dual-view MSI Tiny model (without PMRG/ML) with a single-branch stacked-input model using ConvNeXt-Base or width-adjusted capacity matched as closely as possible to the four-stream model.
-- **Record:** Actual trainable parameters, FLOPs, inference speed, mIoU, macro-F1, OA/ACC, and Kappa; use three seeds if feasible.
-- **Implementation note:** In the current code, unsupported backbone names fall through to ConvNeXt-Base. Add an explicit `convnext_large` route before using Large; a 4B-Large comparison alone is a scale-sensitivity test, not a capacity control.
+- **Protocol:** Relative to the existing ordinary BW experiments (`cxup_1b_BW.yml`, `cxup_2b_BW.yml`, `cxup_3b_BW.yml`, and `cxup_4b_BW.yml`), add 1B-Small and 1B-Base runs by replacing the 1B ConvNeXt-Tiny backbone with a larger size. Keep the existing BW split, loss, crop, training budget, and seed, then compare the resulting capacities and accuracies with 2B-Tiny, 3B-Tiny, and 4B-Tiny.
+- **Record:** Actual trainable parameters, FLOPs, inference speed, mIoU, macro-F1, OA/ACC, and Kappa. The direct supplement uses the existing seed `1919810`; repeat with additional seeds only when extending the uncertainty analysis.
+- **Implementation note:** `CX_Uper` has explicit `convnext_small`, `convnext_base`, and `convnext_large` routes, while unknown names retain the ConvNeXt-Base fallback for compatibility. Standard ConvNeXt-Base is a closer 1B reference for 3B/4B than ConvNeXt-Tiny; exact 4B matching would require a separate width-adjusted backbone.
 - **Deliverables:** Configs/checkpoints, capacity and accuracy table, and seed summary.
 
 #### EXP-03 — Repeated runs and uncertainty
