@@ -1,0 +1,13 @@
+{
+  "input": "E:\\repository\\MRSN\\ana\\smoke\\gpu_memory_probe_4b_city.csv",
+  "samples": 56,
+  "gpu": {
+    "0": {
+      "memory_total_mib": 12282.0,
+      "peak_memory_used_mib": 11876.0,
+      "peak_utilization_percent": 100.0,
+      "peak_memory_percent": 96.69434945448624
+    }
+  },
+  "status": "recorded"
+}

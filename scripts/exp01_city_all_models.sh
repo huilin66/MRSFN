@@ -8,10 +8,32 @@ script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 repo_root="$(cd "$script_dir/.." && pwd)"
 cd "$repo_root"
 
+case "${1:-}" in
+  "") smoke_mode=false ;;
+  --smoke) smoke_mode=true ;;
+  *) echo "Usage: $0 [--smoke]" >&2; exit 2 ;;
+esac
+
+if $smoke_mode; then
+  exp01_output_root="smoke_test/exp01/output"
+  exp01_model_suffix=""
+  exp01_log_args=(--log_dir "smoke_test/exp01/log")
+  exp01_scene_output="smoke_test/exp01/full_scene_train_B_val_W"
+  exp01_train_args=(--iters 100)
+else
+  exp01_output_root="output"
+  exp01_model_suffix="_train_B_val_W"
+  exp01_log_args=()
+  exp01_scene_output="ana/full_scene_city_train_B_val_W"
+  exp01_train_args=()
+fi
+
 # The first model in EXP-01.
 python PaddleCD/train.py \
   --config PaddleCD/c2seg_config/unet_BW_city.yml \
-  --save_dir output/unet_BW_city_train_B_val_W \
+  --save_dir "${exp01_output_root}/unet_BW_city${exp01_model_suffix}" \
+  "${exp01_train_args[@]}" \
+  "${exp01_log_args[@]}" \
   --do_eval
 
 # Remaining models/variants with a *_BW_city.yml configuration. The base
@@ -36,7 +58,9 @@ city_models=(
 for model in "${city_models[@]}"; do
   python PaddleCD/train.py \
     --config "PaddleCD/c2seg_config/${model}.yml" \
-    --save_dir "output/${model}_train_B_val_W" \
+    --save_dir "${exp01_output_root}/${model}${exp01_model_suffix}" \
+    "${exp01_train_args[@]}" \
+    "${exp01_log_args[@]}" \
     --do_eval
 done
 
@@ -52,8 +76,8 @@ for model in "${all_city_models[@]}"; do
     --dataset BW \
     --scene wuhan \
     --config "PaddleCD/c2seg_config/${model}.yml" \
-    --model_path "output/${model}_train_B_val_W/best_model/model.pdparams" \
-    --output_dir ana/full_scene_city_train_B_val_W \
+    --model_path "${exp01_output_root}/${model}${exp01_model_suffix}/best_model/model.pdparams" \
+    --output_dir "${exp01_scene_output}" \
     --crop_size 256 256 \
     --stride 256 256 \
     --batch_size 4 \

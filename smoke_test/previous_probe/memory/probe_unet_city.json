@@ -1,0 +1,13 @@
+{
+  "input": "E:\\repository\\MRSN\\ana\\smoke\\probe_unet_city.csv",
+  "samples": 212,
+  "gpu": {
+    "0": {
+      "memory_total_mib": 12282.0,
+      "peak_memory_used_mib": 11421.0,
+      "peak_utilization_percent": 99.0,
+      "peak_memory_percent": 92.98974108451392
+    }
+  },
+  "status": "recorded"
+}

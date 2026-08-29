@@ -9,6 +9,22 @@ script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 repo_root="$(cd "${script_dir}/.." && pwd)"
 cd "${repo_root}"
 
+case "${1:-}" in
+  "") smoke_mode=false ;;
+  --smoke) smoke_mode=true ;;
+  *) echo "Usage: $0 [--smoke]" >&2; exit 2 ;;
+esac
+
+if $smoke_mode; then
+  exp03_output_root="smoke_test/exp03/output"
+  exp03_log_prefix="smoke_test/exp03/log"
+  exp03_train_args=(--iters 100)
+else
+  exp03_output_root="output"
+  exp03_log_prefix="log/exp03"
+  exp03_train_args=()
+fi
+
 exp03_seeds=(1919810 1919811 1919812)
 exp03_models=(
   cxup_1b_BW
@@ -25,9 +41,10 @@ for seed in "${exp03_seeds[@]}"; do
     echo "[EXP-03] condition=${model}, seed=${seed}"
     python PaddleCD/train.py \
       --config "PaddleCD/c2seg_config/${model}.yml" \
-      --save_dir "output/exp03_${model}_seed${seed}" \
-      --log_dir "log/exp03/${model}_seed${seed}" \
+      --save_dir "${exp03_output_root}/exp03_${model}_seed${seed}" \
+      --log_dir "${exp03_log_prefix}/${model}_seed${seed}" \
       --seed "${seed}" \
+      "${exp03_train_args[@]}" \
       --do_eval
   done
 done
