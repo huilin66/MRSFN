@@ -44,3 +44,5 @@ manuscript/
 *.cff
 
 upload/
+
+demo.sh
