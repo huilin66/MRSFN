@@ -1,6 +1,6 @@
 # MRSN / MRSFN 项目交接文档
 
-> 文档版本：v2.5
+> 文档版本：v2.7
 > 更新时间：2026-08-29  
 > 项目目录：`E:\repository\MRSN`  
 > 目的：帮助后续工作快速理解项目、复现实验并继续处理论文实验。
@@ -11,7 +11,7 @@
 - Origin Mode: `handoff-update`
 - Origin Date: `2026-08-29`
 - Verification Status: `UNVERIFIED`（本文档记录实验计划与当前仓库状态；下方实验尚未全部执行）
-- Version Label: `handoff_v2.5`
+- Version Label: `handoff_v2.7`
 - Upstream Dependencies: `E:\repository\academic research\mrsn\ieee_version\experiment_handoff.md`、当前仓库代码与 `.env`
 
 ## 1. 项目背景
@@ -151,10 +151,13 @@ bash exp_add.sh
 bash scripts/exp01_city_all_models.sh
 bash scripts/exp02_capacity_control.sh
 bash scripts/exp03_repeatability.sh
+bash scripts/exp04_pmrg_evidence.sh
 ```
 
-`exp_add.sh` 只负责按顺序调度已经准备好的实验；每个实验的训练、推理和
-参数集中在 `scripts/` 下对应的独立脚本中。
+`exp_add.sh` 只负责逐行调度已经准备好的实验；每个实验的训练、推理和参数
+集中在 `scripts/` 下对应的独立脚本中。实验脚本之间不互相调用，也不以
+`exp_add.sh` 的执行顺序作为前置条件；需要复用时只直接读取仓库中已经存在的
+配置、模型定义或 checkpoint。
 
 ## 5. 当前仓库状态
 
@@ -207,7 +210,7 @@ label:  (256, 256)
 2. 使用全部城市划分 checkpoint 完成下方 EXP-01 的完整场景/地理独立评估；
 3. 按现有普通 BW 实验协议完成下方 EXP-02 的 1B-Small 和 1B-Base 补充实验；
 4. 完成下方 EXP-03 的 1B--4B 分支数量趋势及 4B 组件增益的重复运行与不确定性统计；
-5. 完成下方 EXP-04 的 PMRG 门控可视化和模态扰动实验；
+5. 实现并完成下方 EXP-04 的 PMRG 门控可视化和模态缺失/噪声证据实验；
 6. 完成下方 EXP-05 的 CMX-adapted 两流基线；
 7. 汇总 checkpoint、指标、推理参数、数据来源和实验 provenance，形成论文可用表格；
 8. 最后再执行 REPO-01 的公共文档命名对齐；该项当前仅作为交接计划，不在本次更新中改动公共代码/文档。
@@ -220,7 +223,7 @@ label:  (256, 256)
 - 现有普通 BW 日志中的参考参数量为：1B-Tiny `30.01M`、2B-Tiny `58.50M`、3B-Tiny `87.00M`、4B-Tiny `115.49M`；在 `mrsn` 环境中实测新增配置为：1B-Small `51.65M`（可训练 `51.64M`），1B-Base `90.05M`（可训练 `90.04M`）；新配置的 FLOPs/FPS 仍以运行日志为准；
 - 上述参数统计使用 Paddle 3.3.1 在 CPU 上构建模型，并临时关闭预训练权重加载；该操作不改变参数数量，正式训练仍按配置的默认初始化策略执行；
 - `scripts/exp02_capacity_control.sh` 使用现有实验的 seed `1919810`，依次运行两个补充配置；
-- `exp_add.sh` 仅作为总调度器，每个实验占一行命令；EXP-01、EXP-02 和 EXP-03 均可从 `scripts/` 独立执行；
+- `exp_add.sh` 仅作为总调度器，每个实验占一行命令；EXP-01 至 EXP-04 均可从 `scripts/` 独立执行；
 - 该实验目前是 `prepared`，尚未在兼容的 Paddle GPU 环境中执行。
 
 ### EXP-03 当前准备状态
@@ -247,6 +250,48 @@ label:  (256, 256)
   `Full-PMRG`、`Full-Loss` 差值，并检查增益方向是否在各 seed 上保持一致。
 - 当前状态为 `prepared`，脚本和配置已就绪，但 21 次训练尚未执行；在没有逐次运行记录前，
   不能声称分支、PMRG 或 loss 的提升已经得到稳定性证明。
+
+### EXP-04 当前设计状态
+
+- EXP-04 收敛为独立的 PMRG 证据实验，分为两部分：`Gate weight` 可视化，以及
+  缺失/噪声 stream 下的性能与 gate 响应测试；不重新训练模型，不调用 EXP-03，
+  也不依赖 `exp_add.sh` 的执行顺序。
+- 当前直接使用仓库中已经存在的同 seed checkpoint：
+  `cxup_4b_BW.yml`（`CX_Uper_4B`）和 `cxup_4b_BW_PMRG.yml`
+  （`CX_Uper_4B_PMRG_V2`），seed metadata 为现有实验的 `1919810`。路径固定为
+  `output/cxup_4b_BW/best_model/model.pdparams` 和
+  `output/cxup_4b_BW_PMRG/best_model/model.pdparams`；不能自动改用
+  `output/exp03_*` 或其他简称/完整 loss checkpoint。
+- 当前已有 checkpoint 对应一个 seed，因此本次独立评估为
+  `2 个模型 × 1 个 seed × 6 个条件 = 12 次验证`。若以后有额外的已有 checkpoint
+  对，需要通过命令行显式传入对应路径逐次运行；EXP-04 不自动发现或生成 EXP-03
+  checkpoint，也不把其他实验的运行结果当作本实验的重复样本。
+- Gate 仅在 PMRG 模型推理时缓存/保存，不改变训练过程和默认输出接口。保存三个尺度
+  `1/4`、`1/8`、`1/16` 的 gate，顺序固定为 `NIRGB | RGB | SAR | HSI`，并上采样到
+  输入图像大小。可视化样本需固定记录原始 RGB、GT、clean prediction、四个 gate map
+  和误差区域叠加图；原始 RGB 应从归一化前数据读取，或使用配置的均值/标准差反归一化。
+- Gate 统计至少包括验证集平均值、标准差、相对于均匀值 `0.25` 的偏移，并尽可能按
+  类别或可验证的场景分组。Gate weight 表示特征调制行为，不得称为校准后的可靠性概率。
+- 最小扰动版本包含 6 个条件：`Clean`、`Missing-RGB`、`Missing-NIRGB`、
+  `Missing-SAR`、`Missing-HSI` 和一个固定噪声条件。四个 missing 条件都在模型分支
+  拆分之后执行；在 `Normalize2` 之后置零表示用该分支各通道的归一化均值替换，若在
+  归一化之前实现则必须使用配置中的 `mean1/mean2`，不能使用原始值 `0`。
+- `Missing-RGB` 与 `Missing-NIRGB` 必须标记为 `branch-level view missing`，不是物理
+  传感器缺失；`Missing-SAR` 与 `Missing-HSI` 才近似独立模态缺失。当前最小版本将
+  `Noisy` 预注册为 HSI stream 的归一化空间高斯噪声，`sigma=1.0`、噪声 seed 为
+  `20260829`，并对两个模型和任意显式传入的已有 checkpoint 对使用同一份按样本固定的
+  噪声；如更换 stream、强度或 seed，必须同步修改实验记录。
+- 当前最小计算量为 `2 个模型 × 1 个已有 seed × 6 个条件 = 12 次验证`。记录 mIoU、
+  F1、ACC、Kappa、相对 Clean 的性能下降，以及受损 stream 的 gate 下降和其他 stream
+  的补偿上升；只有在显式提供多个已有 checkpoint 对时，才做跨 seed 配对汇总。
+- `PaddleCD/paddleseg/models/cx_uper.py` 已加入推理期 gate capture 和分支级扰动接口，
+  默认两参数 forward 行为保持不变；`tools/eval_exp04_pmrg_evidence.py` 已实现
+  指标、gate 统计、固定噪声、PNG/NPZ 可视化和 manifest 输出；
+  `scripts/exp04_pmrg_evidence.sh` 直接调用该 evaluator。
+- 合成输入的 6 条件 model dry-run 已通过；真实验证仍需在可访问配置数据根目录的
+  `mrsn` 环境中运行。真实数据运行前应确认两个固定 checkpoint 存在，并检查生成的
+  `ana/exp04/metrics.csv`、`gate_stats.csv`、`gate_deltas_from_clean.csv` 和
+  `manifest.json`。
 
 ### 源实验交接内容（原文更新版）
 
@@ -294,13 +339,45 @@ label:  (256, 256)
 - **Deliverables:** Per-run result table, mean $\pm$ std summary, matched-seed delta table,
   seed list, and checkpoint/config paths.
 
-#### EXP-04 — PMRG evidence under modality perturbation
+#### EXP-04 — PMRG evidence experiment
 
-- **Goal:** Verify that PMRG produces interpretable stream-dependent modulation and assess its behavior when an input stream is degraded.
-- **Gate visualization:** In evaluation mode, save the three PMRG gate maps at $1/4$, $1/8$, and $1/16$ resolution, upsample them for visualization, and record mean gate weights. The code order is `NIRGB | RGB | SAR | HSI`; gate weights are learned modulation weights, not calibrated reliability probabilities.
-- **Perturbation protocol:** Reuse EXP-03 checkpoints on the same BW validation set. Compare the dual-view MSI reference and dual-view MSI+PMRG under clean input, mean/zero-masked RGB, NIRGB, SAR, and HSI streams, plus one fixed-level Gaussian-noise condition.
-- **Record:** mIoU, macro-F1, OA/ACC, Kappa, performance drop from clean input, and mean gate changes for the perturbed and unperturbed streams. Apply branch-level masking after stream splitting; masking raw MSI should be labeled sensor-level MSI missing because RGB and NIRGB overlap.
-- **Deliverables:** Gate-map figures, perturbation metric table, clean-to-corrupted performance drops, and checkpoint/config paths.
+- **Goal:** Provide direct evidence for PMRG through gate visualization and matched
+  missing/noisy-stream evaluation, without retraining or depending on another EXP.
+- **Part A — Gate visualization:** Use the existing checkpoints for
+  `cxup_4b_BW_PMRG.yml` and save the three gate outputs generated by
+  `CX_Uper_4B_PMRG_V2` at $1/4$, $1/8$, and $1/16$. The gate order is
+  `NIRGB | RGB | SAR | HSI`. Upsample the maps to the input size and show the original
+  RGB image, GT, clean prediction, four stream maps, and an error-region overlay. Report
+  validation-set mean/std gate weights and, where metadata permits, class- or scene-level
+  summaries. Gate weights describe feature modulation and are not calibrated reliability
+  probabilities.
+- **Part B — Missing/noisy streams:** On the same BW validation set, compare the matched
+  `cxup_4b_BW.yml` (`CX_Uper_4B`) and `cxup_4b_BW_PMRG.yml`
+  (`CX_Uper_4B_PMRG_V2`) existing checkpoints. Use six conditions:
+  `Clean`, `Missing-RGB`, `Missing-NIRGB`, `Missing-SAR`, `Missing-HSI`, and one fixed
+  Gaussian-noise condition. The minimum preregistered noise condition is HSI noise in
+  normalized space with sigma `1.0`, noise seed `20260829`, and the same per-sample noise
+  realization for both models and any explicitly supplied checkpoint pair.
+- **Perturbation semantics:** Apply missing-stream replacement after `Normalize2` and after
+  the model's branch split; zero then means replacement by the branch's per-channel training
+  mean. If perturbation is implemented before normalization, use the configured `mean1/mean2`
+  values rather than raw zero. Label RGB and NIRGB conditions as `branch-level view missing`
+  because those views share MSI bands; label raw-MSI masking as sensor-level missing instead.
+  SAR and HSI masking is closer to independent modality missingness.
+- **Record:** For every model, checkpoint pair, and condition, record mIoU, macro-F1/F1, OA/ACC, Kappa,
+  per-class metrics where practical, and
+  $\Delta\mathrm{mIoU}=\mathrm{mIoU}_{clean}-\mathrm{mIoU}_{perturbed}$. Also record mean
+  gate changes for the damaged and compensating streams. Report all per-run values; when
+  multiple explicitly supplied checkpoint pairs exist, add matched-pair mean $\pm$ standard
+  deviation. Do not treat pixels as independent training replicates.
+- **Compute:** The current independent design is `2 models x 1 existing seed x 6 conditions = 12`
+  validation passes. Checkpoint paths must be verified to match the two named configurations;
+  no EXP-03 output directory, `dual-view` shorthand, or full-loss checkpoint is an implicit
+  substitute.
+- **Deliverables:** Gate-map figures, gate statistics, perturbation metric table, clean-to-
+  corrupted drops, matched-seed PMRG comparison when multiple explicit pairs exist,
+  seed/checkpoint/config manifest, and the evaluator configuration. The evaluator is an
+  independent EXP-04 implementation.
 
 #### EXP-05 — CMX-adapted two-stream baseline
 

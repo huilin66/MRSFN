@@ -8,6 +8,71 @@ from paddleseg.cvlibs import manager
 from paddleseg.models.backbones import convnext
 
 
+FOUR_B_STREAM_NAMES = ('NIRGB', 'RGB', 'SAR', 'HSI')
+
+
+def split_4b_streams(t1, t2):
+    """Split the two dataset inputs into the four logical 4B streams.
+
+    ``t1`` contains six normalized MSI/SAR channels in the order
+    ``[MSI_0, MSI_1, MSI_2, MSI_3, SAR_0, SAR_1]`` and ``t2`` contains HSI.
+    NIRGB and RGB intentionally share the first two MSI channels, matching the
+    existing model implementation.
+    """
+    nirgb = paddle.concat([t1[:, :2, ...], t1[:, 3:4, ...]], axis=1)
+    rgb = t1[:, :3, ...]
+    sar = t1[:, 4:, ...]
+    hsi = t2
+    return [nirgb, rgb, sar, hsi]
+
+
+def perturb_4b_streams(streams, perturbation=None, noise=None):
+    """Apply an inference-only perturbation after the 4B stream split.
+
+    Inputs are already processed by ``Normalize2``. Therefore replacing a
+    stream with zeros represents replacement by its configured per-channel
+    training mean. Gaussian noise is supplied by the evaluator so the same
+    realization can be paired across models and seeds.
+    """
+    if perturbation is None or perturbation == 'clean':
+        return streams
+
+    normalized = str(perturbation).lower().replace('-', '_')
+    missing_names = {
+        'missing_nirgb': 0,
+        'missing_rgb': 1,
+        'missing_sar': 2,
+        'missing_hsi': 3,
+    }
+    if normalized in missing_names:
+        index = missing_names[normalized]
+        streams[index] = paddle.zeros_like(streams[index])
+        return streams
+
+    if normalized == 'noisy_hsi':
+        if noise is None:
+            raise ValueError('noisy_hsi requires a normalized-space noise tensor')
+        if tuple(noise.shape) != tuple(streams[3].shape):
+            raise ValueError(
+                'Noise shape {} does not match HSI shape {}'.format(
+                    tuple(noise.shape), tuple(streams[3].shape)))
+        streams[3] = streams[3] + noise
+        return streams
+
+    raise ValueError(
+        'Unknown 4B perturbation {!r}; expected clean, missing_rgb, '
+        'missing_nirgb, missing_sar, missing_hsi, or noisy_hsi'.format(
+            perturbation))
+
+
+def prepare_4b_streams(t1, t2, perturbation=None, noise=None):
+    """Split 4B inputs and optionally apply a branch-level perturbation."""
+    return perturb_4b_streams(
+        split_4b_streams(t1, t2),
+        perturbation=perturbation,
+        noise=noise)
+
+
 @manager.MODELS.add_component
 class CX_Uper(nn.Layer):
     def __init__(self,
@@ -153,11 +218,9 @@ class CX_Uper_4B(nn.Layer):
         self.decode_head4b = UPerHead_4B(self.backbone1.dims[:3], num_classes=num_classes)
         self.drop = nn.Dropout2D(dropout_rate)
 
-    def forward(self, t1, t2):
-        t3 = t2
-        t0 = paddle.concat([t1[:, :2, ...], t1[:, 3:4, ...]], axis=1)
-        t2 = t1[:, 4:, ...]
-        t1 = t1[:, :3, ...]
+    def forward(self, t1, t2, perturbation=None, noise=None):
+        t0, t1, t2, t3 = prepare_4b_streams(
+            t1, t2, perturbation=perturbation, noise=noise)
         fs0 = self.backbone0(t0)
         fs1 = self.backbone1(t1)
         fs2 = self.backbone2(t2)
@@ -626,24 +689,36 @@ class CX_Uper_4B_PMRG_V2(CX_Uper_4B):
     def __init__(self, **kwargs):
         super(CX_Uper_4B_PMRG_V2, self).__init__(**kwargs)
 
+        self.capture_gates = False
+        self.last_gates = None
         self.fusion_blocks = nn.LayerList()
         for dim in self.backbone1.dims[:3]:
             self.fusion_blocks.append(PixelModalityReliabilityGateV2(dim, num_modalities=4))
 
-    def forward(self, t1, t2):
-        t3 = t2
-        t0 = paddle.concat([t1[:, :2, ...], t1[:, 3:4, ...]], axis=1)
-        t2 = t1[:, 4:, ...]
-        t1 = t1[:, :3, ...]
+    def set_gate_capture(self, enabled=True):
+        """Enable inference-time gate caching without changing model outputs."""
+        self.capture_gates = bool(enabled)
+        self.last_gates = None
+
+    def forward(self, t1, t2, perturbation=None, noise=None):
+        t0, t1, t2, t3 = prepare_4b_streams(
+            t1, t2, perturbation=perturbation, noise=noise)
+        self.last_gates = None
         fs0 = self.backbone0(t0)
         fs1 = self.backbone1(t1)
         fs2 = self.backbone2(t2)
         fs3 = self.backbone3(t3)
 
         fs_fused = []
+        captured_gates = []
         for fusion, f0, f1, f2, f3 in zip(self.fusion_blocks, fs0, fs1, fs2, fs3):
-            f, _ = fusion([f0, f1, f2, f3])
+            f, gates = fusion([f0, f1, f2, f3])
+            if self.capture_gates and not self.training:
+                captured_gates.append(gates.detach())
             fs_fused.append(self.drop(f))
+
+        if captured_gates:
+            self.last_gates = captured_gates
 
         y = self.decode_head4b(fs_fused)
         out = F.interpolate(y, size=paddle.shape(t1)[2:], mode='bilinear', align_corners=True)
