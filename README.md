@@ -78,10 +78,19 @@ uses the same `msisar/hsi/lbl` layout + `train.txt` / `val.txt` expected by
 `RS_MD3B`, rescaling full-scene HSI (0-1 reflectance) by 10000 to the patch DN
 range.
 
-Then point a config at it:
+The output root can be controlled with `C2SEG_CITY_ROOT` in `.env`. The
+split name is appended automatically, so `train_B_val_W` is written to
+`<C2SEG_CITY_ROOT>/C2SEG_TRAIN_B_VAL_W` and `train_W_val_B` is written to
+`<C2SEG_CITY_ROOT>/C2SEG_TRAIN_W_VAL_B`:
+
+```text
+C2SEG_CITY_ROOT=<abs/path>/city_split
+```
+
+Then point a city config at the generated dataset:
 
 ```bash
-C2SEG_BW_CITY_ROOT=<abs/path>       # add to .env
+C2SEG_BW_CITY_ROOT=<abs/path>/city_split/C2SEG_TRAIN_B_VAL_W  # add to .env
 python PaddleCD/train.py \
   --config PaddleCD/c2seg_config/cxup_4b_BW_PMRG_v2_lossV2_city.yml \
   --save_dir output/city/... \

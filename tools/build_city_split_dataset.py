@@ -18,7 +18,10 @@ The city pairing is chosen with a single ``--split`` direction (default
 
 The full-scene TIFFs are located automatically from ``C2SEG_BW_ROOT`` in
 ``.env`` (they live in ``.../C2Seg/src/tif_BW``), so no scene root needs to be
-passed. Output defaults to ``data/C2Seg_BW_city_<split>``.
+passed. When ``C2SEG_CITY_ROOT`` is set in ``.env``, output defaults to
+``C2SEG_CITY_ROOT/C2SEG_<SPLIT>`` (for example,
+``C2SEG_CITY_ROOT/C2SEG_TRAIN_B_VAL_W``); otherwise it falls back to
+``data/C2Seg_BW_city_<split>``.
 
 Output layout (matches ``RS_MD3B`` + ``Normalize2`` used by the PaddleCD configs):
 
@@ -63,6 +66,7 @@ from pathlib import Path
 from typing import Iterator
 
 import numpy as np
+import cv2
 
 try:
     import tifffile
@@ -143,6 +147,25 @@ def resolve_scene_root(cli_root: str, env: dict[str, str]) -> Path:
     return Path("")
 
 
+def resolve_output_root(cli_output: str, env: dict[str, str], split: str) -> Path:
+    """Resolve the output directory for a city split.
+
+    ``C2SEG_CITY_ROOT`` is a parent directory. The split name is converted to
+    the canonical dataset directory name automatically, so the two supported
+    splits become ``C2SEG_TRAIN_B_VAL_W`` and ``C2SEG_TRAIN_W_VAL_B``.
+    An explicit ``--output`` always takes precedence.
+    """
+    if cli_output:
+        return Path(cli_output)
+
+    city_root = env.get("C2SEG_CITY_ROOT", "") or os.environ.get("C2SEG_CITY_ROOT", "")
+    city_root = city_root.strip().strip('"').strip("'")
+    if city_root:
+        return Path(city_root) / f"C2SEG_{split.upper()}"
+
+    return REPO_ROOT / "data" / f"C2Seg_BW_city_{split}"
+
+
 # --------------------------------------------------------------------------- #
 # Block reader
 # --------------------------------------------------------------------------- #
@@ -206,6 +229,50 @@ class TiffReader:
 
     def close(self) -> None:
         pass
+
+
+def resize_chw(arr: np.ndarray, out_hw: tuple[int, int]) -> np.ndarray:
+    """Resize a channel-first array to ``(height, width)``."""
+    out_h, out_w = out_hw
+    if arr.ndim != 3 or arr.shape[1] <= 0 or arr.shape[2] <= 0:
+        raise ValueError(f"Cannot resize an empty/non-CHW array: shape={arr.shape}")
+    hwc = np.transpose(arr, (1, 2, 0))
+    resized = cv2.resize(hwc, (out_w, out_h), interpolation=cv2.INTER_LINEAR)
+    if resized.ndim == 2:
+        resized = resized[:, :, None]
+    return np.transpose(resized, (2, 0, 1)).astype("float32", copy=False)
+
+
+def read_hsi_patch(reader: TiffReader, x: int, y: int, w: int, h: int,
+                   target_width: int, target_height: int,
+                   bands: list[int] | None = None) -> np.ndarray:
+    """Read an HSI patch using MSI/SAR coordinates and resize it to target size.
+
+    Full-scene HSI can have a lower spatial resolution than MSI/SAR. Directly
+    slicing it with MSI coordinates produces empty strips once the MSI window
+    moves beyond the HSI extent. Map the window into HSI coordinates first,
+    then resize the sampled HSI block back to the model patch size.
+    """
+    if reader.width <= 0 or reader.height <= 0:
+        raise ValueError(f"HSI source has invalid spatial size: {reader.shape}")
+    if target_width <= 0 or target_height <= 0:
+        raise ValueError(
+            f"Target scene has invalid spatial size: {target_width}x{target_height}")
+
+    hx0 = int(np.floor(x * reader.width / target_width))
+    hy0 = int(np.floor(y * reader.height / target_height))
+    hx1 = int(np.ceil((x + w) * reader.width / target_width))
+    hy1 = int(np.ceil((y + h) * reader.height / target_height))
+
+    hx0 = min(max(hx0, 0), reader.width - 1)
+    hy0 = min(max(hy0, 0), reader.height - 1)
+    hx1 = min(max(hx1, hx0 + 1), reader.width)
+    hy1 = min(max(hy1, hy0 + 1), reader.height)
+
+    hsi = reader.read_patch(hx0, hy0, hx1 - hx0, hy1 - hy0, bands)
+    if hsi.shape[1:] != (h, w):
+        hsi = resize_chw(hsi, (h, w))
+    return hsi
 
 
 # --------------------------------------------------------------------------- #
@@ -285,7 +352,16 @@ def build_scene_split(reader_msi, reader_sar, reader_hsi, reader_lbl,
 
         msi = reader_msi.read_patch(x, y, w, h, msi_bands)     # [4, H, W]
         sar = reader_sar.read_patch(x, y, w, h, sar_bands)     # [2, H, W]
-        hsi = reader_hsi.read_patch(x, y, w, h, hsi_bands)     # [116, H, W]
+        hsi = read_hsi_patch(
+            reader_hsi,
+            x,
+            y,
+            w,
+            h,
+            target_width=reader_msi.width,
+            target_height=reader_msi.height,
+            bands=hsi_bands,
+        )                                                        # [116, H, W]
         lbl = reader_lbl.read_patch(x, y, w, h, None)[0]       # [H, W]
 
         # valid pixels = classes 0..13 (nodata / boundary pixels are filtered)
@@ -306,7 +382,16 @@ def build_scene_split(reader_msi, reader_sar, reader_hsi, reader_lbl,
         )
         tifffile.imwrite(
             out_split / "hsi" / f"{patch_id}.tiff",
-            np.clip(hsi * hsi_scale, 0, 65535).transpose(1, 2, 0).astype("uint16"),
+            np.clip(
+                np.nan_to_num(
+                    hsi * hsi_scale,
+                    nan=0.0,
+                    posinf=65535.0,
+                    neginf=0.0,
+                ),
+                0,
+                65535,
+            ).transpose(1, 2, 0).astype("uint16"),
         )
         lbl_u8 = np.where(valid, lbl, 0).astype("uint8")
         tifffile.imwrite(out_split / "lbl" / f"{patch_id}.tiff", lbl_u8)
@@ -342,7 +427,9 @@ def parse_args() -> argparse.Namespace:
                         "val Beijing.")
     p.add_argument("--output", default="",
                    help="Output root. Writes train/, val/, train.txt, val.txt, "
-                        "metadata.json. Default: data/C2Seg_BW_city_<split>.")
+                        "metadata.json. Default: C2SEG_CITY_ROOT/C2SEG_<SPLIT> "
+                        "when C2SEG_CITY_ROOT is set, otherwise "
+                        "data/C2Seg_BW_city_<split>.")
     p.add_argument("--train-scene", default="", help=argparse.SUPPRESS)
     p.add_argument("--val-scene", default="", help=argparse.SUPPRESS)
     p.add_argument("--crop-size", nargs=2, type=int, default=[256, 256],
@@ -376,9 +463,12 @@ def main() -> None:
             "Pass --scene-root or point C2SEG_BW_ROOT at .../C2Seg/src/C2Seg_BW in .env."
         )
 
-    out_root = Path(args.output) if args.output \
-        else REPO_ROOT / "data" / f"C2Seg_BW_city_{args.split}"
-    meta: dict = {"scene_root": str(scene_root), "argparse": vars(args)}
+    out_root = resolve_output_root(args.output, env, args.split)
+    meta: dict = {
+        "scene_root": str(scene_root),
+        "output_root": str(out_root),
+        "argparse": vars(args),
+    }
 
     train_scene, val_scene = SPLITS[args.split]
     if args.train_scene:  # hidden override, e.g. for non-B/W experiments
@@ -405,6 +495,19 @@ def main() -> None:
         r_sar = TiffReader(sar_p, "SAR")
         r_hsi = TiffReader(hsi_p, "HSI")
         r_lbl = TiffReader(lbl_p, "label")
+
+        if (r_sar.width, r_sar.height) != (r_msi.width, r_msi.height):
+            raise SystemExit(
+                f"[{scene}] SAR spatial size {r_sar.width}x{r_sar.height} "
+                f"does not match MSI {r_msi.width}x{r_msi.height}"
+            )
+        if (r_lbl.width, r_lbl.height) != (r_msi.width, r_msi.height):
+            raise SystemExit(
+                f"[{scene}] label spatial size {r_lbl.width}x{r_lbl.height} "
+                f"does not match MSI {r_msi.width}x{r_msi.height}"
+            )
+        print(f"[{scene}] MSI/SAR/label={r_msi.width}x{r_msi.height}, "
+              f"HSI={r_hsi.width}x{r_hsi.height} (mapped and resized per patch)")
 
         msi_bands = args.msi_bands or list(range(1, r_msi.count + 1))
         sar_bands = args.sar_bands or list(range(1, r_sar.count + 1))
@@ -442,7 +545,7 @@ def main() -> None:
     n_val = meta.get("val", {}).get("kept_patches", 0)
     print(f"\nDone. split={args.split} -> train={n_train} patches, "
           f"val={n_val} patches -> {out_root}")
-    print("Next: add C2SEG_BW_CITY_ROOT=<absolute output path> to .env, then train with "
+    print(f"Next: set C2SEG_BW_CITY_ROOT={out_root} in .env, then train with "
           "PaddleCD/c2seg_config/*_BW_city.yml")
 
 
