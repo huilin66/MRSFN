@@ -2,7 +2,10 @@
 
 ## Scope
 
-This repository contains the PaddlePaddle/PaddleSeg implementation for the MRSN/MBFM experiments. The C2Seg-BW dataset is not redistributed here.
+This repository contains the PaddlePaddle/PaddleSeg implementation for the
+MRSN/MRSFN experiments. MRSN denotes the earlier WHISPERS 2023 model, while
+MRSFN denotes the current multi-branch extension. The C2Seg-BW dataset is not
+redistributed here.
 
 ## Environment
 
@@ -71,7 +74,7 @@ python val.py --config c2seg_config/cxup_4b_BW_PMRG_v2_lossV2.yml --model_path .
 | 4-branch | 0.8659 | 0.9269 | 0.9598 | 0.9459 | 115.49 | 91.76 | 49.96 |
 | 4-branch + PMRG | 0.8671 | 0.9277 | 0.9602 | 0.9465 | 116.51 | 94.18 | 41.42 |
 | 4-branch + ML | 0.8684 | 0.9281 | 0.9656 | 0.9537 | 115.49 | 91.76 | 51.61 |
-| MBFM (4-branch + PMRG + ML) | 0.8694 | 0.9287 | 0.9658 | 0.9539 | 116.51 | 94.18 | 42.86 |
+| MRSFN (4-branch + PMRG + ML) | 0.8694 | 0.9287 | 0.9658 | 0.9539 | 116.51 | 94.18 | 42.86 |
 
 ## Release Notes
 

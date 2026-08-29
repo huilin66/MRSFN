@@ -1,17 +1,23 @@
-# MRSN / MBFM
+# MRSFN / MRSN
 
-This repository provides the PaddlePaddle/PaddleSeg implementation for two multimodal remote sensing semantic segmentation works:
+This repository provides the PaddlePaddle/PaddleSeg implementation for the current
+MRSFN extension and the earlier MRSN multimodal remote sensing semantic
+segmentation work:
 
-- **Multimodal Remote Sensing Network (MRSN)**, WHISPERS 2023.
-- **Multi-Branch Fusion Model (MBFM)**, an extended multi-branch fusion framework with Pixel-wise Modality Reliability Gate (PMRG) and mixed loss.
+- **MRSFN**, the current multi-branch extension with Pixel-wise Modality Reliability Gate (PMRG) and mixed loss.
+- **MRSN (Multimodal Remote Sensing Network)**, the earlier WHISPERS 2023 model and baseline.
 
 The code supports training, validation, prediction, and experimental analysis on the C2Seg-BW multimodal remote sensing segmentation setting.
+
+MRSFN continues the earlier MRSN work. The original MRSN repository is
+[huilin16/MRSN](https://github.com/huilin16/MRSN), while this repository contains
+the current MRSFN extension at [huilin66/MRSFN](https://github.com/huilin66/MRSFN).
 
 ## Repository Layout
 
 ```text
 PaddleCD/                 PaddleSeg-based training, validation, prediction code
-PaddleCD/c2seg_config/    Experiment configs for MRSN/MBFM variants and baselines
+PaddleCD/c2seg_config/    Experiment configs for MRSFN, historical MRSN, and baselines
 tools/                    Analysis, visualization, split, and post-processing scripts
 pic/                      Repository-level architecture image
 docs/                     Reproducibility notes
@@ -23,8 +29,8 @@ upload/                   Release-ready model weights and train/validation logs
 Clone the repository and install the Python dependencies:
 
 ```bash
-git clone https://github.com/huilin66/MRSN.git
-cd MRSN
+git clone https://github.com/huilin66/MRSFN.git
+cd MRSFN
 pip install -r PaddleCD/requirements.txt
 ```
 

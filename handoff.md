@@ -1,6 +1,6 @@
 # MRSN / MRSFN 项目交接文档
 
-> 文档版本：v2.7
+> 文档版本：v2.8
 > 更新时间：2026-08-29  
 > 项目目录：`E:\repository\MRSN`  
 > 目的：帮助后续工作快速理解项目、复现实验并继续处理论文实验。
@@ -11,7 +11,7 @@
 - Origin Mode: `handoff-update`
 - Origin Date: `2026-08-29`
 - Verification Status: `UNVERIFIED`（本文档记录实验计划与当前仓库状态；下方实验尚未全部执行）
-- Version Label: `handoff_v2.7`
+- Version Label: `handoff_v2.8`
 - Upstream Dependencies: `E:\repository\academic research\mrsn\ieee_version\experiment_handoff.md`、当前仓库代码与 `.env`
 
 ## 1. 项目背景
@@ -389,7 +389,7 @@ label:  (256, 256)
 
 #### REPO-01 — Repository documentation and naming alignment
 
-- **Scope:** This is a documentation handoff only. Do not modify the code repository in the current step. When executed later, update public documentation only; do not rename source files or technical configuration identifiers solely for branding.
+- **Scope:** This is a documentation-only task. The public-documentation portion has now been applied to `README.md` and `docs/REPRODUCIBILITY.md`; no source code, configuration, technical identifier, or checkpoint was renamed.
 - **Current name:** Use `MRSFN` for the current submitted model and extension work (the multi-branch, PMRG, and mixed-loss configuration). Treat `MBFM` as a legacy name that should not appear as the current model name in public documentation.
 - **Prior work:** Keep `MRSN` for the authors' earlier WHISPERS 2023 model, its baseline results, historical experiments, and citation. Do not mechanically replace every occurrence of `MRSN` with `MRSFN`.
 - **Repository relationship:** Explain that MRSFN continues the authors' earlier MRSN work. Link the original MRSN repository as `https://github.com/huilin16/MRSN` and the current repository as `https://github.com/huilin66/MRSFN`.
@@ -397,6 +397,7 @@ label:  (256, 256)
 - **docs/REPRODUCIBILITY.md:** Change the current-project scope to `MRSN/MRSFN` and rename only the final current-model row from `MBFM (4-branch + PMRG + ML)` to `MRSFN (4-branch + PMRG + ML)`. Keep MRSN baseline rows and historical descriptions unchanged.
 - **Technical and historical names to preserve:** Keep `MRSN_BW.yml`, `MRSN_AB.yml`, `MRSN_BW_city.yml`, `CX_Uper*`, `cxup_*`, historical challenge/paper materials, and `mrsn` identifiers when they refer to the prior MRSN baseline. Change a `mrsn` label only when it actually denotes the current final model.
 - **Verification after execution:** Search public repository documentation for residual current-model uses of `MBFM`, verify both repository links and clone commands, and confirm that the original MRSN model remains separately traceable. Do not push changes as part of this task.
+- **Current status:** The public-documentation search is clean: `README.md` and `docs/REPRODUCIBILITY.md` use `MRSFN` for the current model, retain MRSN for the earlier model, contain the corrected repository relationship/clone commands, and no longer use `MBFM` as a public model label. No push was performed.
 
 ## 8. 交接约定
 
