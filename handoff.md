@@ -1,6 +1,6 @@
 # MRSN / MRSFN 项目交接文档
 
-> 文档版本：v2.4
+> 文档版本：v2.5
 > 更新时间：2026-08-29  
 > 项目目录：`E:\repository\MRSN`  
 > 目的：帮助后续工作快速理解项目、复现实验并继续处理论文实验。
@@ -11,7 +11,7 @@
 - Origin Mode: `handoff-update`
 - Origin Date: `2026-08-29`
 - Verification Status: `UNVERIFIED`（本文档记录实验计划与当前仓库状态；下方实验尚未全部执行）
-- Version Label: `handoff_v2.4`
+- Version Label: `handoff_v2.5`
 - Upstream Dependencies: `E:\repository\academic research\mrsn\ieee_version\experiment_handoff.md`、当前仓库代码与 `.env`
 
 ## 1. 项目背景
@@ -115,7 +115,8 @@ ConvNeXt-Small 和 ConvNeXt-Base 替换现有 1B 的 ConvNeXt-Tiny，使其参�
 - 初始学习率：0.0002；
 - StepDecay：每 5,000 iterations 衰减为 0.5；
 - seed：1,919,810；
-- 常用损失：`Poly1Loss_Smooth + 0.5 * DiceLoss`。
+- 普通 BW 基线损失：`CrossEntropyLoss_Smooth + 0.5 * DiceLoss`；EXP-03 的 loss 变体使用
+  `Poly1Loss_Smooth + 0.5 * DiceLoss`。
 
 ## 4. 常用运行方式
 
@@ -149,6 +150,7 @@ python tools/build_city_split_dataset.py --split train_B_val_W
 bash exp_add.sh
 bash scripts/exp01_city_all_models.sh
 bash scripts/exp02_capacity_control.sh
+bash scripts/exp03_repeatability.sh
 ```
 
 `exp_add.sh` 只负责按顺序调度已经准备好的实验；每个实验的训练、推理和
@@ -158,7 +160,7 @@ bash scripts/exp02_capacity_control.sh
 
 截至 2026-08-29：
 
-- 当前分支为 `re`，HEAD 为 `ff014fc`，工作区存在未提交修改和新增实验文件，包括 `.gitignore`、`PaddleCD/c2seg_config/C2Seg_BW_city.yml`、`PaddleCD/paddleseg/models/cx_uper.py`、`README.md`、`handoff.md`、`exp_add.sh`、`scripts/` 以及 EXP-02 配置；这些修改继续保留，后续操作前需先核对归属。
+- 当前分支为 `re`，HEAD 为 `ff014fc`，工作区存在未提交修改和新增实验文件，包括 `.gitignore`、`PaddleCD/c2seg_config/C2Seg_BW_city.yml`、`PaddleCD/paddleseg/models/cx_uper.py`、`README.md`、`handoff.md`、`exp_add.sh`、`scripts/`、`tools/summarize_exp03.py` 以及 EXP-02/EXP-03 配置；这些修改继续保留，后续操作前需先核对归属。
 - `output/` 中已有多种 baseline、MRSN、4B、PMRG 和损失变体的 checkpoint。
 - 当前 MRSFN/PMRG V2 验证日志记录的代表性结果为：mIoU `0.8694`、F1 `0.9287`、ACC `0.9658`、Kappa `0.9539`、参数量约 `116.51M`、FLOPs 约 `94.18G`。原始配置、日志和 checkpoint 中的技术名称仍可能使用 `MBFM` 或 `cxup_*`，应按上下文解释。
 - 本地城市级数据目录 `data/C2Seg_BW_city_train_B_val_W` 包含北京训练 1,855 个 patch、武汉验证 850 个 patch。
@@ -204,7 +206,7 @@ label:  (256, 256)
 1. 准备 Paddle GPU 运行环境，使用 `exp_add.sh` 按同一城市划分训练全部 15 个 BW 模型/变体；
 2. 使用全部城市划分 checkpoint 完成下方 EXP-01 的完整场景/地理独立评估；
 3. 按现有普通 BW 实验协议完成下方 EXP-02 的 1B-Small 和 1B-Base 补充实验；
-4. 完成下方 EXP-03 的重复运行与不确定性统计；
+4. 完成下方 EXP-03 的 1B--4B 分支数量趋势及 4B 组件增益的重复运行与不确定性统计；
 5. 完成下方 EXP-04 的 PMRG 门控可视化和模态扰动实验；
 6. 完成下方 EXP-05 的 CMX-adapted 两流基线；
 7. 汇总 checkpoint、指标、推理参数、数据来源和实验 provenance，形成论文可用表格；
@@ -218,8 +220,33 @@ label:  (256, 256)
 - 现有普通 BW 日志中的参考参数量为：1B-Tiny `30.01M`、2B-Tiny `58.50M`、3B-Tiny `87.00M`、4B-Tiny `115.49M`；在 `mrsn` 环境中实测新增配置为：1B-Small `51.65M`（可训练 `51.64M`），1B-Base `90.05M`（可训练 `90.04M`）；新配置的 FLOPs/FPS 仍以运行日志为准；
 - 上述参数统计使用 Paddle 3.3.1 在 CPU 上构建模型，并临时关闭预训练权重加载；该操作不改变参数数量，正式训练仍按配置的默认初始化策略执行；
 - `scripts/exp02_capacity_control.sh` 使用现有实验的 seed `1919810`，依次运行两个补充配置；
-- `exp_add.sh` 仅作为总调度器，每个实验占一行命令；EXP-01 和 EXP-02 均可从 `scripts/` 独立执行；
+- `exp_add.sh` 仅作为总调度器，每个实验占一行命令；EXP-01、EXP-02 和 EXP-03 均可从 `scripts/` 独立执行；
 - 该实验目前是 `prepared`，尚未在兼容的 Paddle GPU 环境中执行。
+
+### EXP-03 当前准备状态
+
+- EXP-03 使用普通 BW 协议，不使用城市级划分；固定比较以下 7 个条件：
+  `cxup_1b_BW.yml`、`cxup_2b_BW.yml`、`cxup_3b_BW.yml`、`cxup_4b_BW.yml`、
+  `cxup_4b_BW_PMRG.yml`、`cxup_4b_BW_loss.yml`、
+  `cxup_4b_BW_PMRG_v2_lossV2.yml`。
+- 分支稳定性链为 `1B -> 2B -> 3B -> 4B`，用于检验增加分支后性能提升是否稳定；
+  组件稳定性链以 `4B` 为共同 baseline，分别检验 `PMRG`、`Loss` 以及
+  `PMRG + Loss` 的增益是否稳定。`cxup_4b_BW_PMRG_ML.yml` 与完整配置内容相同，
+  不重复作为独立条件运行。
+- `scripts/exp03_repeatability.sh` 为上述 7 个条件分别使用 seed
+  `1919810`、`1919811`、`1919812`，共 21 次运行；每次输出到
+  `output/exp03_<config>_seed<seed>/`，日志单独保存到
+  `log/exp03/<config>_seed<seed>/`，并开启 `--do_eval`。
+- 全部训练结束后运行 `python tools/summarize_exp03.py`；工具从每个日志中选取最高验证
+  mIoU 的评估点，生成 `ana/exp03/per_run.csv`、`condition_summary.csv`、
+  `matched_deltas.csv` 和 `stability_summary.csv`。
+- 结果记录须包含每次运行的 mIoU、macro-F1/F1、OA/ACC、Kappa，以及 Params、FLOPs、FPS；
+  汇总报告均值 ± 标准差和逐 seed 结果。稳定性判断还需记录同 seed 的
+  `2B-1B`、`3B-2B`、`4B-3B`、`4B-1B`、`4B+PMRG-4B`、
+  `4B+Loss-4B`、`4B+PMRG+Loss-4B`，以及在已改变另一组件时的
+  `Full-PMRG`、`Full-Loss` 差值，并检查增益方向是否在各 seed 上保持一致。
+- 当前状态为 `prepared`，脚本和配置已就绪，但 21 次训练尚未执行；在没有逐次运行记录前，
+  不能声称分支、PMRG 或 loss 的提升已经得到稳定性证明。
 
 ### 源实验交接内容（原文更新版）
 
@@ -245,10 +272,27 @@ label:  (256, 256)
 
 #### EXP-03 — Repeated runs and uncertainty
 
-- **Goal:** Quantify run-to-run variation and support the PMRG/ML component claims.
-- **Protocol:** Repeat the dual-view MSI reference, dual-view MSI+PMRG, dual-view MSI+ML, and full MRSFN on the same BW split and training protocol with at least three fixed seeds (preferably five).
-- **Record:** Per-run mIoU, macro-F1, OA/ACC, and Kappa; report mean $\pm$ standard deviation and list all seeds. Params/FLOPs need only be reported once per configuration.
-- **Deliverables:** Per-run results, mean $\pm$ std table, seed list, and checkpoint/config paths.
+- **Goal:** Test whether the branch-count improvement and the 4B PMRG/loss improvements are
+  repeatable rather than artifacts of one random seed.
+- **Conditions:** Run `cxup_1b_BW.yml`, `cxup_2b_BW.yml`, `cxup_3b_BW.yml`, and
+  `cxup_4b_BW.yml` for the branch-count chain; then run `cxup_4b_BW_PMRG.yml`,
+  `cxup_4b_BW_loss.yml`, and `cxup_4b_BW_PMRG_v2_lossV2.yml` for the 4B component
+  ablations. The 4B baseline is shared by both comparisons. Do not count the byte-identical
+  `cxup_4b_BW_PMRG_ML.yml` as another condition.
+- **Protocol:** Use the same ordinary BW split, preprocessing, crop, optimizer, training budget,
+  initialization policy, and data root for all conditions. Use the three fixed seeds
+  `1919810`, `1919811`, and `1919812` initially (five seeds are preferable if compute permits).
+- **Record:** For every run, record mIoU, macro-F1/F1, OA/ACC, Kappa, checkpoint/config path,
+  seed, Params, FLOPs, and FPS. Report per-condition mean $\pm$ standard deviation and retain
+  all per-seed values.
+- **Stability analysis:** For matched seeds, calculate `2B-1B`, `3B-2B`, and `4B-3B` to assess
+  the branch trend, plus the total `4B-1B` change. Calculate `4B+PMRG-4B`,
+  `4B+Loss-4B`, and `4B+PMRG+Loss-4B` to assess the component gains; also report
+  `4B+PMRG+Loss-4B+PMRG` and `4B+PMRG+Loss-4B+Loss` as matched-factor cross-checks.
+  Treat a gain as repeatable only when its direction is consistent across seeds and the
+  summary uncertainty is reported; this is evidence of stability, not a causal proof by itself.
+- **Deliverables:** Per-run result table, mean $\pm$ std summary, matched-seed delta table,
+  seed list, and checkpoint/config paths.
 
 #### EXP-04 — PMRG evidence under modality perturbation
 

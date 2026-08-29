@@ -5,3 +5,4 @@ set -euo pipefail
 # independently from scripts/.
 bash scripts/exp01_city_all_models.sh
 bash scripts/exp02_capacity_control.sh
+bash scripts/exp03_repeatability.sh
