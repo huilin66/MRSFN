@@ -45,4 +45,13 @@ manuscript/
 
 upload/
 
+# smoke-test experiment artifacts (kept locally, not committed)
+smoke_test/exp01/
+smoke_test/exp02/
+smoke_test/exp03/
+smoke_test/exp04/
+smoke_test/*.log
+smoke_test/gpu_memory.csv
+smoke_test/gpu_memory_summary.json
+
 demo.sh

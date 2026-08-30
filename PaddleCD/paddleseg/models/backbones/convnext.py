@@ -15,6 +15,7 @@
 # Code was based on https://github.com/facebookresearch/ConvNeXt
 # from https://github.com/PaddlePaddle/PASSL/blob/main/passl/modeling/backbones/convnext.py
 
+import os
 import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
@@ -30,7 +31,7 @@ model_urls = {
                  'c5541588b0906df1b853982e1d463eec'),
     'convnext_small': ('https://passl.bj.bcebos.com/models/convnext_small_1k_224.pdparams',
                  'f4a6f26284889fa0953a2fe5b8167215'),
-    'convnext_base':('data/data127804/convnext_base_1k_224_ema.pdparams', '')
+    'convnext_base':('convnext_base_1k_224_ema.pdparams', '')
 }
 
 trunc_normal_ = nn.initializer.TruncatedNormal(std=0.02)
@@ -236,7 +237,7 @@ def _convnext(arch, depths, pretrained, **kwargs):
         if arch != 'convnext_base':
             weight_path = get_weights_path_from_url(model_urls[arch][0], model_urls[arch][1])
         else:
-            weight_path = model_urls[arch][0]
+            weight_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), model_urls[arch][0])
 
         param = paddle.load(weight_path)
         param = keys_process(param)

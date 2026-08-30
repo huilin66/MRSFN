@@ -24,7 +24,7 @@ python tools/eval_exp04_pmrg_evidence.py \
   --baseline-config "PaddleCD/c2seg_config/cxup_4b_BW.yml" \
   --pmrg-config "PaddleCD/c2seg_config/cxup_4b_BW_PMRG.yml" \
   --baseline-checkpoint "output/cxup_4b_BW/best_model/model.pdparams" \
-  --pmrg-checkpoint "output/cxup_4b_BW_PMRG/best_model/model.pdparams" \
+  --pmrg-checkpoint "output/cxup_4b_BW_PMRG_v2/best_model/model.pdparams" \
   --seed 1919810 \
   --conditions clean missing_rgb missing_nirgb missing_sar missing_hsi noisy_hsi \
   --output-dir "${exp04_output_dir}" \
