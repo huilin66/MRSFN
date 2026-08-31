@@ -9,11 +9,17 @@ script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 repo_root="$(cd "${script_dir}/.." && pwd)"
 cd "${repo_root}"
 
-case "${1:-}" in
-  "") smoke_mode=false ;;
-  --smoke) smoke_mode=true ;;
-  *) echo "Usage: $0 [--smoke]" >&2; exit 2 ;;
-esac
+source "${script_dir}/resume_helpers.sh"
+
+smoke_mode=false
+resume_mode=false
+for arg in "$@"; do
+  case "$arg" in
+    --smoke) smoke_mode=true ;;
+    --resume) resume_mode=true ;;
+    *) echo "Usage: $0 [--smoke] [--resume]" >&2; exit 2 ;;
+  esac
+done
 
 if $smoke_mode; then
   exp03_output_root="smoke_test/exp03/output"
@@ -38,13 +44,25 @@ exp03_models=(
 
 for seed in "${exp03_seeds[@]}"; do
   for model in "${exp03_models[@]}"; do
+    exp03_save_dir="${exp03_output_root}/exp03_${model}_seed${seed}"
     echo "[EXP-03] condition=${model}, seed=${seed}"
+    resume_args=()
+    if $resume_mode; then
+      ckpt="$(latest_iter_ckpt "${exp03_save_dir}")"
+      if [[ -n "${ckpt}" ]]; then
+        echo "[EXP-03] resuming ${model} (seed ${seed}) from ${ckpt}"
+        resume_args=(--resume_model "${ckpt}")
+      else
+        echo "[EXP-03] no checkpoint to resume for ${model} (seed ${seed}); training from scratch"
+      fi
+    fi
     python PaddleCD/train.py \
       --config "PaddleCD/c2seg_config/${model}.yml" \
-      --save_dir "${exp03_output_root}/exp03_${model}_seed${seed}" \
+      --save_dir "${exp03_save_dir}" \
       --log_dir "${exp03_log_prefix}/${model}_seed${seed}" \
       --seed "${seed}" \
       "${exp03_train_args[@]}" \
+      "${resume_args[@]}" \
       --do_eval
   done
 done

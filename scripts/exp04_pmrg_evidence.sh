@@ -8,11 +8,16 @@ script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 repo_root="$(cd "${script_dir}/.." && pwd)"
 cd "${repo_root}"
 
-case "${1:-}" in
-  "") smoke_mode=false ;;
-  --smoke) smoke_mode=true ;;
-  *) echo "Usage: $0 [--smoke]" >&2; exit 2 ;;
-esac
+smoke_mode=false
+for arg in "$@"; do
+  case "$arg" in
+    --smoke) smoke_mode=true ;;
+    # EXP-04 is inference-only, so resume is a no-op; accepted so that
+    # exp_add.sh can forward --resume uniformly to every experiment.
+    --resume) echo "[EXP-04] inference-only; --resume ignored" >&2 ;;
+    *) echo "Usage: $0 [--smoke]" >&2; exit 2 ;;
+  esac
+done
 
 if $smoke_mode; then
   exp04_output_dir="smoke_test/exp04"

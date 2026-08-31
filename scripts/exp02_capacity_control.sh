@@ -10,11 +10,17 @@ script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 repo_root="$(cd "$script_dir/.." && pwd)"
 cd "$repo_root"
 
-case "${1:-}" in
-  "") smoke_mode=false ;;
-  --smoke) smoke_mode=true ;;
-  *) echo "Usage: $0 [--smoke]" >&2; exit 2 ;;
-esac
+source "${script_dir}/resume_helpers.sh"
+
+smoke_mode=false
+resume_mode=false
+for arg in "$@"; do
+  case "$arg" in
+    --smoke) smoke_mode=true ;;
+    --resume) resume_mode=true ;;
+    *) echo "Usage: $0 [--smoke] [--resume]" >&2; exit 2 ;;
+  esac
+done
 
 exp02_seed=1919810
 
@@ -31,11 +37,23 @@ else
 fi
 
 for model in cxup_1b_BW_small cxup_1b_BW_base; do
+  exp02_save_dir="${exp02_output_root}/${model}${exp02_model_suffix}"
+  resume_args=()
+  if $resume_mode; then
+    ckpt="$(latest_iter_ckpt "${exp02_save_dir}")"
+    if [[ -n "${ckpt}" ]]; then
+      echo "[EXP-02] resuming ${model} from ${ckpt}"
+      resume_args=(--resume_model "${ckpt}")
+    else
+      echo "[EXP-02] no checkpoint to resume for ${model}; training from scratch"
+    fi
+  fi
   python PaddleCD/train.py \
     --config "PaddleCD/c2seg_config/${model}.yml" \
-    --save_dir "${exp02_output_root}/${model}${exp02_model_suffix}" \
+    --save_dir "${exp02_save_dir}" \
     --seed "$exp02_seed" \
     "${exp02_train_args[@]}" \
     "${exp02_log_args[@]}" \
+    "${resume_args[@]}" \
     --do_eval
 done

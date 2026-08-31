@@ -36,3 +36,29 @@ Run smoke tests independently with:
 ```bash
 bash scripts/smoke_test_all.sh
 ```
+
+## Resuming interrupted runs
+
+Every training experiment script (`exp01`, `exp02`, `exp03`) accepts a
+`--resume` flag. When it is set, each `train.py` call automatically resumes
+from the **latest `iter_*` checkpoint** already present in that run's
+`--save_dir` (via `scripts/resume_helpers.sh::latest_iter_ckpt`). Runs with no
+existing checkpoint simply start from scratch. EXP-04 is inference-only, so it
+accepts `--resume` but ignores it.
+
+Resume targets an `iter_NNNN` directory (not `best_model`): PaddleSeg parses
+the starting iteration from the trailing number of the directory name, which is
+also why a run saved only under `best_model/` must be restarted from scratch.
+
+```bash
+# resume every experiment (exp01-04) from their latest checkpoints
+bash exp_add.sh resume          # same as: bash exp_add.sh --resume
+
+# resume a single experiment from its latest checkpoints
+bash scripts/exp01_city_all_models.sh --resume
+bash scripts/exp02_capacity_control.sh --resume
+bash scripts/exp03_repeatability.sh --resume
+```
+
+`--smoke` and `--resume` can be combined (e.g. `--smoke --resume`); smoke runs
+then resume their own `smoke_test/...` checkpoints.
