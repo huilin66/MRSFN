@@ -14,17 +14,18 @@ val_dataset:
   dataset_root: ${C2SEG_BW_CITY_WB_ROOT}/val
   val_path:  ${C2SEG_BW_CITY_WB_ROOT}/val.txt
 
-# The reversed city split has ~850 training patches (~53 full batches at
+# The reversed city split has 850 training patches (~53.125 full batches at
 # batch_size 16) — about 0.46x the forward split's 1,855 — because the Wuhan
-# train scene is smaller than Beijing's.  To compare the two geographic
-# directions at the SAME ~100 epochs (not the same raw iters), iters is scaled
-# down from the forward 11500 (which would be ~217 epochs here and overfit the
-# smaller train set).  lr step_size and save_interval are scaled to keep the
-# same per-epoch LR-decay and snapshot cadence.  NOTE: calibrated to the
-# inferred Wuhan count (850); re-check against the generated train.txt line
-# count after build_city_split_dataset.py --split train_W_val_B.
-iters: 5300
+# train scene is smaller than Beijing's (val therefore becomes 1,855 patches).
+# To compare the two geographic directions at the SAME ~100 epochs (the forward
+# 11500 iters would be ~217 epochs here and overfit the smaller train set), the
+# values below are scaled from 850/16 = 53.125 iters per epoch:
+#   iters        = round(100  * 53.125) = 5313
+#   save_interval= round(2    * 53.125) = 106   (snapshot ~every 2 epochs)
+#   step_size    = round(12.5 * 53.125) = 664   (LR halves every ~12.5 epochs)
+# keeping the same epoch-wise LR-decay and snapshot cadence as the forward split.
+iters: 5313
 save_interval: 106
 
 lr_scheduler:
-  step_size: 660
+  step_size: 664
