@@ -29,7 +29,7 @@ mkdir -p log/exp03_parallel
 : > .exp03_pids
 
 declare -a pids=()
-for g in 0 1 2; do
+for g in 0 1; do
   args=(--group "$g")
   $smoke_mode && args+=(--smoke)
   $resume_mode && args+=(--resume)
@@ -39,9 +39,8 @@ for g in 0 1 2; do
   echo "group${g} ${pids[$g]}" >> .exp03_pids
 done
 
-echo "[EXP-03] launched 3 parallel groups:"
-echo "  group0 (seed 1919810): pid ${pids[0]}  -> log/exp03_parallel/group0.log"
-echo "  group1 (seed 1919811): pid ${pids[1]}  -> log/exp03_parallel/group1.log"
-echo "  group2 (seed 1919812): pid ${pids[2]}  -> log/exp03_parallel/group2.log"
+echo "[EXP-03] launched 2 parallel groups (the default single-thread run used instead:)"
+echo "  group0 (seed 1919811): pid ${pids[0]}  -> log/exp03_parallel/group0.log"
+echo "  group1 (seed 1919812): pid ${pids[1]}  -> log/exp03_parallel/group1.log"
 echo "pids written to .exp03_pids"
 echo "monitor with:  bash scripts/exp03_status.sh --watch 30"

@@ -13,14 +13,14 @@ source "${script_dir}/resume_helpers.sh"
 
 smoke_mode=false
 resume_mode=false
-EXPO3_GROUP=""   # empty = run all seeds sequentially; 0|1|2 = this seed-parallel group only
+EXPO3_GROUP=""   # empty = run all seeds sequentially; 0|1 = this seed-parallel group only
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --smoke) smoke_mode=true; shift ;;
     --resume) resume_mode=true; shift ;;
     --group) EXPO3_GROUP="$2"; shift 2 ;;
     --group=*) EXPO3_GROUP="${1#*=}"; shift ;;
-    *) echo "Usage: $0 [--smoke] [--resume] [--group {0|1|2}]" >&2; exit 2 ;;
+    *) echo "Usage: $0 [--smoke] [--resume] [--group {0|1}]" >&2; exit 2 ;;
   esac
 done
 
@@ -34,7 +34,10 @@ else
   exp03_train_args=()
 fi
 
-exp03_seeds=(1919810 1919811 1919812)
+# Repeatability evidence chain: seeds = default train.py seed (1919810) + {0,1,2}.
+# Seed 1919810 is the ORIGINAL experiment (main.ipynb, no --seed => default), whose
+# data already exists. EXP-03 only adds the two NEW seeds in the same chain.
+exp03_seeds=(1919811 1919812)
 exp03_models=(
   cxup_1b_BW
   cxup_2b_BW
@@ -45,13 +48,13 @@ exp03_models=(
   cxup_4b_BW_PMRG_v2_lossV2
 )
 
-# Parallel-group mode: --group {0|1|2} selects ONE seed's 7-model block so 3
-# terminals (one per group) train concurrently on the same GPU. Without it, all
-# 21 runs execute sequentially (EXP-03's original behaviour, used by exp_add.sh).
+# Parallel-group mode: --group {0|1} selects ONE seed's 7-model block so 2
+# terminals (one per group) can train concurrently. Without it, all runs execute
+# sequentially (the default, single-threaded: 2 seeds x 7 models = 14 runs).
 if [[ -n "$EXPO3_GROUP" ]]; then
   case "$EXPO3_GROUP" in
-    0|1|2) ;;
-    *) echo "Usage: --group must be 0, 1, or 2" >&2; exit 2 ;;
+    0|1) ;;
+    *) echo "Usage: --group must be 0 or 1" >&2; exit 2 ;;
   esac
   exp03_seeds=("${exp03_seeds[$EXPO3_GROUP]}")
   echo "[EXP-03] parallel group ${EXPO3_GROUP}: seed=${exp03_seeds[0]}, 7 models"

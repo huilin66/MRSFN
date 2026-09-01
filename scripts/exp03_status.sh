@@ -16,7 +16,7 @@ script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 repo_root="$(cd "${script_dir}/.." && pwd)"
 cd "${repo_root}"
 
-SEEDS=(1919810 1919811 1919812)
+SEEDS=(1919811 1919812)
 MODELS=(cxup_1b_BW cxup_2b_BW cxup_3b_BW cxup_4b_BW \
         cxup_4b_BW_PMRG cxup_4b_BW_loss cxup_4b_BW_PMRG_v2_lossV2)
 LOG_PREFIX="log/exp03"
@@ -94,7 +94,6 @@ print_all() {
   printf ' %s\n' "--------------------------------------------------------------------------------"
   row_seed 0
   row_seed 1
-  row_seed 2
 }
 
 if [[ -n "$watch_secs" ]]; then
