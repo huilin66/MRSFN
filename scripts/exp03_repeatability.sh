@@ -13,11 +13,14 @@ source "${script_dir}/resume_helpers.sh"
 
 smoke_mode=false
 resume_mode=false
-for arg in "$@"; do
-  case "$arg" in
-    --smoke) smoke_mode=true ;;
-    --resume) resume_mode=true ;;
-    *) echo "Usage: $0 [--smoke] [--resume]" >&2; exit 2 ;;
+EXPO3_GROUP=""   # empty = run all seeds sequentially; 0|1|2 = this seed-parallel group only
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --smoke) smoke_mode=true; shift ;;
+    --resume) resume_mode=true; shift ;;
+    --group) EXPO3_GROUP="$2"; shift 2 ;;
+    --group=*) EXPO3_GROUP="${1#*=}"; shift ;;
+    *) echo "Usage: $0 [--smoke] [--resume] [--group {0|1|2}]" >&2; exit 2 ;;
   esac
 done
 
@@ -41,6 +44,18 @@ exp03_models=(
   cxup_4b_BW_loss
   cxup_4b_BW_PMRG_v2_lossV2
 )
+
+# Parallel-group mode: --group {0|1|2} selects ONE seed's 7-model block so 3
+# terminals (one per group) train concurrently on the same GPU. Without it, all
+# 21 runs execute sequentially (EXP-03's original behaviour, used by exp_add.sh).
+if [[ -n "$EXPO3_GROUP" ]]; then
+  case "$EXPO3_GROUP" in
+    0|1|2) ;;
+    *) echo "Usage: --group must be 0, 1, or 2" >&2; exit 2 ;;
+  esac
+  exp03_seeds=("${exp03_seeds[$EXPO3_GROUP]}")
+  echo "[EXP-03] parallel group ${EXPO3_GROUP}: seed=${exp03_seeds[0]}, 7 models"
+fi
 
 for seed in "${exp03_seeds[@]}"; do
   for model in "${exp03_models[@]}"; do
