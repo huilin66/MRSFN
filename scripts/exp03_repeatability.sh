@@ -28,10 +28,12 @@ if $smoke_mode; then
   exp03_output_root="smoke_test/exp03/output"
   exp03_log_prefix="smoke_test/exp03/log"
   exp03_train_args=(--iters 100)
+  exp03_target_iters=100
 else
   exp03_output_root="output"
   exp03_log_prefix="log/exp03"
   exp03_train_args=()
+  exp03_target_iters=40000
 fi
 
 # Repeatability evidence chain: seeds = default train.py seed (1919810) + {0,1,2}.
@@ -63,16 +65,22 @@ fi
 for seed in "${exp03_seeds[@]}"; do
   for model in "${exp03_models[@]}"; do
     exp03_save_dir="${exp03_output_root}/exp03_${model}_seed${seed}"
-    echo "[EXP-03] condition=${model}, seed=${seed}"
     resume_args=()
     if $resume_mode; then
       ckpt="$(latest_iter_ckpt "${exp03_save_dir}")"
       if [[ -n "${ckpt}" ]]; then
-        echo "[EXP-03] resuming ${model} (seed ${seed}) from ${ckpt}"
+        ckpt_iter="$(checkpoint_iter "${ckpt}")"
+        if checkpoint_reaches_target "${ckpt}" "${exp03_target_iters}"; then
+          echo "[EXP-03] checking ${model} (seed ${seed}): complete at iter_${ckpt_iter}; skip"
+          continue
+        fi
+        echo "[EXP-03] checking ${model} (seed ${seed}): resume from iter_${ckpt_iter}"
         resume_args=(--resume_model "${ckpt}")
       else
-        echo "[EXP-03] no checkpoint to resume for ${model} (seed ${seed}); training from scratch"
+        echo "[EXP-03] checking ${model} (seed ${seed}): no resumable checkpoint; start"
       fi
+    else
+      echo "[EXP-03] condition=${model}, seed=${seed}"
     fi
     python PaddleCD/train.py \
       --config "PaddleCD/c2seg_config/${model}.yml" \

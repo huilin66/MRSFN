@@ -29,3 +29,29 @@ latest_iter_ckpt() {
     echo "${ckpt}"
     return 0
 }
+
+# checkpoint_iter <checkpoint_dir> ::
+#   Print the numeric iteration encoded by an iter_N directory. Return an
+#   empty string for an invalid checkpoint path.
+checkpoint_iter() {
+    local ckpt="${1:-}"
+    local name="${ckpt##*/}"
+    if [[ "${name}" =~ ^iter_([0-9]+)$ ]]; then
+        echo "${BASH_REMATCH[1]}"
+    else
+        echo ""
+    fi
+    return 0
+}
+
+# checkpoint_reaches_target <checkpoint_dir> <target_iter> ::
+#   Return success when the checkpoint is at or beyond the requested target.
+#   This is intentionally a directory-name check; latest_iter_ckpt has already
+#   verified that both model.pdparams and model.pdopt are present.
+checkpoint_reaches_target() {
+    local ckpt="$1"
+    local target_iter="$2"
+    local iter
+    iter="$(checkpoint_iter "${ckpt}")"
+    [[ -n "${iter}" && "${iter}" -ge "${target_iter}" ]]
+}
