@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# EXP-01: train all models on the Beijing-train / Wuhan-validation split, then
-# run tiled inference on the complete Wuhan scene for every city-disjoint
-# checkpoint.
+# EXP-01: train all models on the Beijing-train / Wuhan-validation split.
+# Validation is performed on Wuhan patches by the training loop; no redundant
+# full-scene Wuhan inference is performed.
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 repo_root="$(cd "$script_dir/.." && pwd)"
 cd "$repo_root"
@@ -24,13 +24,11 @@ if $smoke_mode; then
   exp01_output_root="smoke_test/exp01/output"
   exp01_model_suffix=""
   exp01_log_args=(--log_dir "smoke_test/exp01/log")
-  exp01_scene_output="smoke_test/exp01/full_scene_train_B_val_W"
   exp01_train_args=(--iters 100)
 else
   exp01_output_root="output"
   exp01_model_suffix="_train_B_val_W"
   exp01_log_args=()
-  exp01_scene_output="ana/full_scene_city_train_B_val_W"
   exp01_train_args=()
 fi
 
@@ -92,24 +90,4 @@ for model in "${city_models[@]}"; do
     "${exp01_log_args[@]}" \
     "${resume_args[@]}" \
     --do_eval
-done
-
-# EXP-01 continuation: tiled inference on the complete Wuhan scene for every
-# city-disjoint checkpoint produced above.
-all_city_models=(
-  unet_BW_city
-  "${city_models[@]}"
-)
-
-for model in "${all_city_models[@]}"; do
-  python tools/infer_full_scene.py \
-    --dataset BW \
-    --scene wuhan \
-    --config "PaddleCD/c2seg_config/${model}.yml" \
-    --model_path "${exp01_output_root}/${model}${exp01_model_suffix}/best_model/model.pdparams" \
-    --output_dir "${exp01_scene_output}" \
-    --crop_size 256 256 \
-    --stride 256 256 \
-    --batch_size 4 \
-    --device gpu
 done
