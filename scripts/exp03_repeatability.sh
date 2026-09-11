@@ -39,13 +39,13 @@ fi
 # data already exists. EXP-03 only adds the two NEW seeds in the same chain.
 exp03_seeds=(1919811 1919812)
 exp03_models=(
-  cxup_1b_BW
-  cxup_2b_BW
-  cxup_3b_BW
   cxup_4b_BW
   cxup_4b_BW_PMRG
   cxup_4b_BW_loss
   cxup_4b_BW_PMRG_v2_lossV2
+  cxup_1b_BW
+  cxup_2b_BW
+  cxup_3b_BW
 )
 
 # Parallel-group mode: --group {0|1} selects ONE seed's 7-model block so 2
