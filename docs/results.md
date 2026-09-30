@@ -133,7 +133,51 @@ repeatability experiment.
 The repeatability table is reported separately from the single-seed BW and AB
 tables above and should be used for stability claims.
 
-## 6. Model naming
+## 6. EXP-04 PMRG evidence experiment
+
+EXP-04 is an inference-only evidence experiment on the BW validation set. It
+uses seed `1919810`, batch size `1`, and `714` validation samples without
+retraining. The comparison is between the 4B baseline and the 4B+PMRG model.
+Missing-stream perturbations are applied after `Normalize2` and after the
+four-stream split; zero denotes the corresponding normalized training mean.
+RGB and NIRGB are therefore treated as branch-level view missing conditions.
+For noisy HSI, Gaussian noise with `sigma=1.0` is added after normalization.
+
+### 6.1 Condition-wise validation results
+
+| Model | Condition | mIoU | F1 | Accuracy | Kappa |
+|---|---|---:|---:|---:|---:|
+| 4B baseline | Clean | 0.8659 | 0.9269 | 0.9598 | 0.9459 |
+| 4B baseline | Missing-RGB | 0.6425 | 0.7757 | 0.8427 | 0.7779 |
+| 4B baseline | Missing-NIRGB | 0.5568 | 0.7064 | 0.8351 | 0.7725 |
+| 4B baseline | Missing-SAR | 0.7660 | 0.8618 | 0.9281 | 0.9028 |
+| 4B baseline | Missing-HSI | 0.7977 | 0.8836 | 0.9385 | 0.9170 |
+| 4B baseline | Noisy-HSI | 0.8532 | 0.9195 | 0.9544 | 0.9386 |
+| 4B + PMRG | Clean | 0.8671 | 0.9277 | 0.9602 | 0.9465 |
+| 4B + PMRG | Missing-RGB | 0.6364 | 0.7667 | 0.8347 | 0.7650 |
+| 4B + PMRG | Missing-NIRGB | 0.5749 | 0.7225 | 0.8304 | 0.7653 |
+| 4B + PMRG | Missing-SAR | 0.7687 | 0.8633 | 0.9280 | 0.9030 |
+| 4B + PMRG | Missing-HSI | 0.7897 | 0.8765 | 0.9385 | 0.9167 |
+| 4B + PMRG | Noisy-HSI | 0.8540 | 0.9200 | 0.9549 | 0.9392 |
+
+### 6.2 Clean gate statistics
+
+The clean PMRG gate statistics below report the spatial mean for the three
+feature scales. The stream order is `NIRGB | RGB | SAR | HSI`; the offset is
+relative to the uniform reference weight `0.25`.
+
+| Stage | NIRGB | RGB | SAR | HSI |
+|---|---:|---:|---:|---:|
+| 1/4 | 0.3321 (+0.0821) | 0.2756 (+0.0256) | 0.2097 (-0.0403) | 0.1826 (-0.0674) |
+| 1/8 | 0.4536 (+0.2036) | 0.2275 (-0.0225) | 0.1744 (-0.0756) | 0.1445 (-0.1055) |
+| 1/16 | 0.1597 (-0.0903) | 0.1419 (-0.1081) | 0.3229 (+0.0729) | 0.3755 (+0.1255) |
+
+The gate values describe feature modulation, not calibrated reliability
+probabilities. In this one-seed evaluation, PMRG does not improve every
+missing-stream condition; therefore EXP-04 provides qualitative gate and
+perturbation evidence rather than a universal robustness claim.
+
+## 7. Model naming
 
 - `MRSN`: earlier/legacy structure, represented by `cxup_4b2h_BW` and
   `cxup_4b2h_AB` in the current result archives.
