@@ -91,12 +91,49 @@ also the model used as the UpderNet baseline, while the final row is MRSFN.
 - These single-seed BW and AB results should be reported descriptively; the
   EXP-03 multi-seed results are required for repeatability claims.
 
-## 4. Repeatability
+## 4. EXP-02 Backbone and capacity comparison
 
-The EXP-03 multi-seed results will be added here separately. They should not be
-merged into the single-seed BW or AB values above.
+This supplementary BW experiment compares the ConvNeXt-Tiny branch-count
+series with two larger-backbone variants. The 1B--4B rows vary the number of
+branches while using ConvNeXt-Tiny; the two EXP-02 rows keep the 1B branch
+layout and replace the backbone with ConvNeXt-Small or ConvNeXt-Base. This is
+an empirical capacity/backbone check rather than a parameter-matched causal
+comparison.
 
-## 5. Model naming
+### 4.1 BW results
+
+| Configuration | Backbone | Technical configuration | mIoU | F1 | Accuracy | Kappa | Params | FLOPs | FPS |
+|---|---|---|---:|---:|---:|---:|---:|---:|---:|
+| 1B / UpderNet | ConvNeXt-Tiny | `cxup_1b_BW` | 0.8025 | 0.8878 | 0.9328 | 0.9094 | 30.01M | 31.70G | 143.93 |
+| 2B | ConvNeXt-Tiny | `cxup_2b_BW` | 0.8342 | 0.9079 | 0.9470 | 0.9286 | 58.50M | 51.71G | 104.47 |
+| 3B | ConvNeXt-Tiny | `cxup_3b_BW` | 0.8496 | 0.9173 | 0.9537 | 0.9377 | 87.00M | 71.73G | 85.27 |
+| 4B | ConvNeXt-Tiny | `cxup_4b_BW` | 0.8659 | 0.9269 | 0.9598 | 0.9459 | 115.49M | 91.76G | 49.96 |
+| 1B + larger backbone | ConvNeXt-Small | `cxup_1b_BW_small_exp02` | 0.8203 | 0.8993 | 0.9410 | 0.9204 | 51.65M | 53.80G | 64.78 |
+| 1B + larger backbone | ConvNeXt-Base | `cxup_1b_BW_base_exp02` | 0.8301 | 0.9054 | 0.9454 | 0.9264 | 90.05M | 86.07G | 45.12 |
+
+## 5. EXP-03 Repeatability
+
+The following values are calculated over seeds `1919810`, `1919811`, and
+`1919812`. Seed `1919810` comes from the original `output_bw/` checkpoints;
+seeds `1919811` and `1919812` come from the `output/exp03_*` checkpoints. Each
+seed contributes the metrics of its best-validation checkpoint. Values are
+reported as mean ± sample standard deviation and are limited to the BW
+repeatability experiment.
+
+| Configuration | mIoU (mean ± std) | F1 (mean ± std) | Accuracy (mean ± std) | Kappa (mean ± std) |
+|---|---:|---:|---:|---:|
+| 1B / UpderNet | 0.8011 ± 0.0013 | 0.8870 ± 0.0008 | 0.9324 ± 0.0004 | 0.9089 ± 0.0005 |
+| 2B | 0.8337 ± 0.0006 | 0.9075 ± 0.0004 | 0.9468 ± 0.0004 | 0.9283 ± 0.0006 |
+| 3B | 0.8507 ± 0.0010 | 0.9180 ± 0.0006 | 0.9538 ± 0.0001 | 0.9378 ± 0.0002 |
+| 4B | 0.8653 ± 0.0006 | 0.9265 ± 0.0004 | 0.9596 ± 0.0003 | 0.9456 ± 0.0004 |
+| 4B + PMRG | 0.8666 ± 0.0007 | 0.9274 ± 0.0004 | 0.9601 ± 0.0003 | 0.9462 ± 0.0005 |
+| 4B + ML | 0.8691 ± 0.0006 | 0.9284 ± 0.0003 | 0.9657 ± 0.0002 | 0.9539 ± 0.0003 |
+| 4B + PMRG + ML / MRSFN | 0.8698 ± 0.0005 | 0.9289 ± 0.0003 | 0.9661 ± 0.0003 | 0.9543 ± 0.0005 |
+
+The repeatability table is reported separately from the single-seed BW and AB
+tables above and should be used for stability claims.
+
+## 6. Model naming
 
 - `MRSN`: earlier/legacy structure, represented by `cxup_4b2h_BW` and
   `cxup_4b2h_AB` in the current result archives.
