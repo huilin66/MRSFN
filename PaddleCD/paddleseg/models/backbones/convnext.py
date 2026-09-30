@@ -31,7 +31,8 @@ model_urls = {
                  'c5541588b0906df1b853982e1d463eec'),
     'convnext_small': ('https://passl.bj.bcebos.com/models/convnext_small_1k_224.pdparams',
                  'f4a6f26284889fa0953a2fe5b8167215'),
-    'convnext_base':('convnext_base_1k_224_ema.pdparams', '')
+    'convnext_base':('convnext_base_1k_224_ema.pdparams', ''),
+    'convnext_large':('convnext_large_1k_224_ema.pdparams', '')
 }
 
 trunc_normal_ = nn.initializer.TruncatedNormal(std=0.02)
@@ -234,7 +235,7 @@ def _convnext(arch, depths, pretrained, **kwargs):
     if pretrained:
         assert arch in model_urls, "{} model do not have a pretrained model now, you should set pretrained=False".format(
             arch)
-        if arch != 'convnext_base':
+        if arch not in ('convnext_base', 'convnext_large'):
             weight_path = get_weights_path_from_url(model_urls[arch][0], model_urls[arch][1])
         else:
             weight_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), model_urls[arch][0])
@@ -268,9 +269,10 @@ def convnext_base(pretrained=True, in_22k=False, **kwargs):
     return _convnext('convnext_base', depths=[3, 3, 27, 3], dims=[128, 256, 512, 1024], pretrained=pretrained, **kwargs)
 
 
-def convnext_large(pretrained=False, in_22k=False, **kwargs):
-    model = ConvNeXt(depths=[3, 3, 27, 3], dims=[192, 384, 768, 1536], **kwargs)
-    return model
+def convnext_large(pretrained=True, in_22k=False, **kwargs):
+    return _convnext('convnext_large', depths=[3, 3, 27, 3],
+                     dims=[192, 384, 768, 1536], pretrained=pretrained,
+                     **kwargs)
 
 
 def convnext_xlarge(pretrained=False, in_22k=False, **kwargs):

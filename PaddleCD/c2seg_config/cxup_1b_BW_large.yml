@@ -1,0 +1,12 @@
+_base_: 'C2Seg_BW.yml'
+
+# EXP-02 supplemental run: retain the 1B single-backbone design while using
+# ConvNeXt-Large to test whether the observed gain is explained by backbone
+# capacity alone.
+model:
+  type: CX_Uper
+  backb: convnext_large
+  in_channels: 3
+  num_classes: 14
+  dropout_rate: 0
+  hsi_chs: 116
