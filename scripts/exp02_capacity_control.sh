@@ -2,8 +2,9 @@
 set -euo pipefail
 
 # EXP-02: supplement the existing ordinary BW experiments with larger-backbone
-# models. The 1B Small/Base variants probe the single-backbone capacity effect;
-# the 2B Small variant tests the same question with the dual-backbone design.
+# models. The 1B Small/Base/Large variants probe the single-backbone capacity
+# effect; the 2B Small variant tests the same question with the dual-backbone
+# design.
 # The split, loss, crop, budget, and seed match the existing BW experiments;
 # this is not part of the EXP-01 city-split run.
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -36,7 +37,7 @@ else
   exp02_train_args=()
 fi
 
-for model in cxup_1b_BW_small cxup_1b_BW_base cxup_2b_BW_small; do
+for model in cxup_1b_BW_small cxup_1b_BW_base cxup_1b_BW_large cxup_2b_BW_small; do
   exp02_save_dir="${exp02_output_root}/${model}${exp02_model_suffix}"
   resume_args=()
   if $resume_mode; then
