@@ -2,10 +2,10 @@
 set -euo pipefail
 
 # EXP-02: supplement the existing ordinary BW experiments with larger-backbone
-# 1B models. ConvNeXt-Small approaches the existing 2B-Tiny parameter scale;
-# ConvNeXt-Base approaches 3B-Tiny and is the closest standard 1B comparison
-# for 4B-Tiny. The split, loss, crop, budget, and seed match the existing BW
-# experiments; this is not part of the EXP-01 city-split run.
+# models. The 1B Small/Base variants probe the single-backbone capacity effect;
+# the 2B Small variant tests the same question with the dual-backbone design.
+# The split, loss, crop, budget, and seed match the existing BW experiments;
+# this is not part of the EXP-01 city-split run.
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 repo_root="$(cd "$script_dir/.." && pwd)"
 cd "$repo_root"
@@ -36,7 +36,7 @@ else
   exp02_train_args=()
 fi
 
-for model in cxup_1b_BW_small cxup_1b_BW_base; do
+for model in cxup_1b_BW_small cxup_1b_BW_base cxup_2b_BW_small; do
   exp02_save_dir="${exp02_output_root}/${model}${exp02_model_suffix}"
   resume_args=()
   if $resume_mode; then

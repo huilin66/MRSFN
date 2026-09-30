@@ -1,0 +1,12 @@
+_base_: 'C2Seg_BW.yml'
+
+# EXP-02 supplemental run: retain the 2B dual-backbone design while using
+# ConvNeXt-Small to test the effect of backbone capacity separately from the
+# branch-count series.
+model:
+  type: CX_Uper_2B
+  backb: convnext_small
+  in_channels: 3
+  num_classes: 14
+  dropout_rate: 0
+  hsi_chs: 116
