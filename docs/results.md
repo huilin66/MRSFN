@@ -234,7 +234,26 @@ and Missing-NIRGB conditions, but is lower under Missing-SAR, Missing-HSI, and
 Noisy-HSI. The final-model gate statistics and perturbation responses are
 stored with the raw outputs in `ana/exp04_repeat_mrsfn/`.
 
-## 7. Model naming
+## 7. EXP-06 MSI branch control
+
+This section is reserved for the formal comparison between the current
+overlapping optical branch layout (`NIRGB | RGB`) and the non-overlapping
+four-stream layout (`RGB | NIR | SAR | HSI`). The model, data split, loss,
+training budget, and seed follow the ordinary 4B BW experiment; only the
+optical branch split changes. The 100-iteration smoke result is an execution
+check and is not reported as a formal result.
+
+### 7.1 BW results
+
+| Configuration | Branch layout | Technical configuration | Seed | mIoU | F1 | Accuracy | Kappa | Params | FLOPs | FPS |
+|---|---|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| 4B non-overlapping MSI control | `RGB \| NIR \| SAR \| HSI` | `cxup_4b_BW_RGB_NIR_exp06` / `cxup_4b_BW_RGB_NIR.yml` | 1919810 | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
+
+Formal EXP-06 training and evaluation are pending. The result should be
+interpreted as a branch-layout control, not as an additional model-capacity
+comparison.
+
+## 8. Model naming
 
 - `MRSN`: earlier/legacy structure, represented by `cxup_4b2h_BW` and
   `cxup_4b2h_AB` in the current result archives.
