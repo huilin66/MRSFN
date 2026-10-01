@@ -236,6 +236,62 @@ class CX_Uper_4B(nn.Layer):
 
 
 @manager.MODELS.add_component
+class CX_Uper_4B_RGB_NIR(nn.Layer):
+    """Four-branch control with non-overlapping RGB and NIR streams.
+
+    The dataset input ``t1`` is ordered as ``RGB(3) | NIR(1) | SAR(2)`` and
+    ``t2`` contains HSI.  This model keeps the 4B fusion head and training
+    protocol unchanged while replacing the overlapping ``NIRGB | RGB`` pair
+    with ``RGB | NIR``.
+    """
+
+    def __init__(self,
+                 in_channels,
+                 num_classes,
+                 backb,
+                 hsi_chs=242,
+                 dropout_rate=0.0,
+                 ):
+        super(CX_Uper_4B_RGB_NIR, self).__init__()
+        if backb == 'convnext_tiny':
+            backbone = convnext.convnext_tiny
+        elif backb == 'convnext_small':
+            backbone = convnext.convnext_small
+        elif backb == 'convnext_large':
+            backbone = convnext.convnext_large
+        else:
+            backbone = convnext.convnext_base
+
+        self.backbone0 = backbone(in_chans=3)
+        self.backbone1 = backbone(in_chans=1)
+        self.backbone2 = backbone(in_chans=2)
+        self.backbone3 = backbone(in_chans=hsi_chs)
+
+        self.decode_head4b = UPerHead_4B(
+            self.backbone1.dims[:3], num_classes=num_classes)
+        self.drop = nn.Dropout2D(dropout_rate)
+
+    def forward(self, t1, t2):
+        rgb = t1[:, :3, ...]
+        nir = t1[:, 3:4, ...]
+        sar = t1[:, 4:, ...]
+        fs0 = self.backbone0(rgb)
+        fs1 = self.backbone1(nir)
+        fs2 = self.backbone2(sar)
+        fs3 = self.backbone3(t2)
+
+        fs_fused = []
+        for f0, f1, f2, f3 in zip(fs0, fs1, fs2, fs3):
+            f = self.drop(paddle.concat([f0, f1, f2, f3], axis=1))
+            fs_fused.append(f)
+        y = self.decode_head4b(fs_fused)
+        out = F.interpolate(
+            y, size=paddle.shape(rgb)[2:], mode='bilinear', align_corners=True)
+
+        return [out]
+
+
+@manager.MODELS.add_component
 class CX_Uper_4B_MPPM(CX_Uper_4B):
     def __init__(self,
                  in_channels,
