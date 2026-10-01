@@ -1,0 +1,16 @@
+_base_: 'C2Seg_BW.yml'
+
+# EXP-05 CMX baseline.  The two inputs match cxup_2b_BW exactly:
+# stream 1 = six MSI/SAR channels, stream 2 = 116 HSI channels.
+model:
+  type: CMX
+  backbone:
+    type: CMXBackbone
+    in_channels1: 6
+    in_channels2: 116
+    backbone: mit_b2
+    pretrained: https://bj.bcebos.com/paddleseg/dygraph/backbone/mix_vision_transformer_b2.tar.gz
+  embedding_dim: 768
+  dropout_ratio: 0.1
+  align_corners: false
+  num_classes: 14
