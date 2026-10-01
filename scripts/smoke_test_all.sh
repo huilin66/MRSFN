@@ -6,7 +6,8 @@ set -euo pipefail
 # optimizer/loss/batch settings remain inherited from their normal configs.
 # EXP-04 is inference-only, so its --smoke flag uses a separate artifact
 # directory but keeps all six evaluation conditions.
-# EXP-05 is intentionally absent until its CMX model/configuration exists.
+# EXP-05 remains reserved for the CMX baseline; EXP-06 is the non-overlapping
+# MSI branch control implemented below.
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 repo_root="$(cd "${script_dir}/.." && pwd)"
 cd "${repo_root}"
@@ -54,5 +55,8 @@ bash scripts/exp03_repeatability.sh --smoke
 
 echo "[SMOKE] EXP-04"
 bash scripts/exp04_pmrg_evidence.sh --smoke
+
+echo "[SMOKE] EXP-06"
+bash scripts/exp06_msi_branch_control.sh --smoke
 
 echo "[SMOKE] all currently implemented experiments completed"

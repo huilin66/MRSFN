@@ -8,7 +8,8 @@ to the repository root before invoking its own training or evaluation command.
 - `exp02_capacity_control.sh`: EXP-02, the larger-backbone 1B (Small/Base/Large) and 2B (Small) supplemental BW runs.
 - `exp03_repeatability.sh`: EXP-03, the 1B--4B branch-count chain and the 4B PMRG/loss ablations over three fixed seeds (21 runs).
 - `exp04_pmrg_evidence.sh`: EXP-04, direct gate visualization and branch-level missing/noisy-stream evaluation using the existing 4B BW checkpoints (inference only).
-- `smoke_test_all.sh`: runs the smoke variant of EXP-01--04; training commands override only `--iters 100`, while EXP-04 keeps its inference conditions. All smoke checkpoints, logs, evaluation outputs, and GPU-memory records are stored below the independent `smoke_test/` folder.
+- `exp06_msi_branch_control.sh`: EXP-06, the non-overlapping `RGB | NIR | SAR | HSI` four-branch control for the overlapping MSI split.
+- `smoke_test_all.sh`: runs the smoke variant of EXP-01--04 and EXP-06; training commands override only `--iters 100`, while EXP-04 keeps its inference conditions. All smoke checkpoints, logs, evaluation outputs, and GPU-memory records are stored below the independent `smoke_test/` folder.
 
 The smoke artifact layout is:
 
@@ -18,6 +19,7 @@ smoke_test/
   exp02/   # checkpoints and logs
   exp03/   # checkpoints and per-run logs
   exp04/   # evaluation outputs
+  exp06/   # checkpoints and logs for the MSI branch-control smoke run
   gpu_memory.csv
   gpu_memory_summary.json
 ```
@@ -39,7 +41,7 @@ bash scripts/smoke_test_all.sh
 
 ## Resuming interrupted runs
 
-Every training experiment script (`exp01`, `exp02`, `exp03`) accepts a
+Every training experiment script (`exp01`, `exp02`, `exp03`, `exp06`) accepts a
 `--resume` flag. When it is set, each `train.py` call automatically resumes
 from the **latest `iter_*` checkpoint** already present in that run's
 `--save_dir` (via `scripts/resume_helpers.sh::latest_iter_ckpt`). Runs with no
@@ -51,13 +53,14 @@ the starting iteration from the trailing number of the directory name, which is
 also why a run saved only under `best_model/` must be restarted from scratch.
 
 ```bash
-# resume every experiment (exp01-04) from their latest checkpoints
+# resume every implemented experiment (exp01-04 and exp06) from their latest checkpoints
 bash exp_add.sh resume          # same as: bash exp_add.sh --resume
 
 # resume a single experiment from its latest checkpoints
 bash scripts/exp01_city_all_models.sh --resume
 bash scripts/exp02_capacity_control.sh --resume
 bash scripts/exp03_repeatability.sh --resume
+bash scripts/exp06_msi_branch_control.sh --resume
 ```
 
 `--smoke` and `--resume` can be combined (e.g. `--smoke --resume`); smoke runs
