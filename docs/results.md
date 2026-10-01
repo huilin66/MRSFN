@@ -136,46 +136,95 @@ tables above and should be used for stability claims.
 ## 6. EXP-04 PMRG evidence experiment
 
 EXP-04 is an inference-only evidence experiment on the BW validation set. It
-uses seed `1919810`, batch size `1`, and `714` validation samples without
-retraining. The comparison is between the 4B baseline and the 4B+PMRG model.
-Missing-stream perturbations are applied after `Normalize2` and after the
-four-stream split; zero denotes the corresponding normalized training mean.
-RGB and NIRGB are therefore treated as branch-level view missing conditions.
-For noisy HSI, Gaussian noise with `sigma=1.0` is added after normalization.
+uses the paired best checkpoints from seeds `1919810`, `1919811`, and
+`1919812`, with batch size `1` and `714` validation samples per seed; no
+retraining is performed. The primary comparison is between the 4B baseline
+and the 4B+PMRG model. The final MRSFN configuration is not used here because
+its additional ML component would confound attribution of the gate behavior to
+PMRG. Missing-stream perturbations are applied after `Normalize2` and after
+the four-stream split; zero denotes the corresponding normalized training
+mean. RGB and NIRGB are therefore treated as branch-level view missing
+conditions. For noisy HSI, Gaussian noise with `sigma=1.0` is added after
+normalization. Values below are mean +/- sample standard deviation over the
+three seeds.
+
+Raw outputs are stored in `ana/exp04_repeat/seed1919810/`,
+`ana/exp04_repeat/seed1919811/`, and `ana/exp04_repeat/seed1919812/`.
 
 ### 6.1 Condition-wise validation results
 
 | Model | Condition | mIoU | F1 | Accuracy | Kappa |
 |---|---|---:|---:|---:|---:|
-| 4B baseline | Clean | 0.8659 | 0.9269 | 0.9598 | 0.9459 |
-| 4B baseline | Missing-RGB | 0.6425 | 0.7757 | 0.8427 | 0.7779 |
-| 4B baseline | Missing-NIRGB | 0.5568 | 0.7064 | 0.8351 | 0.7725 |
-| 4B baseline | Missing-SAR | 0.7660 | 0.8618 | 0.9281 | 0.9028 |
-| 4B baseline | Missing-HSI | 0.7977 | 0.8836 | 0.9385 | 0.9170 |
-| 4B baseline | Noisy-HSI | 0.8532 | 0.9195 | 0.9544 | 0.9386 |
-| 4B + PMRG | Clean | 0.8671 | 0.9277 | 0.9602 | 0.9465 |
-| 4B + PMRG | Missing-RGB | 0.6364 | 0.7667 | 0.8347 | 0.7650 |
-| 4B + PMRG | Missing-NIRGB | 0.5749 | 0.7225 | 0.8304 | 0.7653 |
-| 4B + PMRG | Missing-SAR | 0.7687 | 0.8633 | 0.9280 | 0.9030 |
-| 4B + PMRG | Missing-HSI | 0.7897 | 0.8765 | 0.9385 | 0.9167 |
-| 4B + PMRG | Noisy-HSI | 0.8540 | 0.9200 | 0.9549 | 0.9392 |
+| 4B baseline | Clean | 0.865249 +/- 0.000584 | 0.926535 +/- 0.000366 | 0.959596 +/- 0.000308 | 0.945597 +/- 0.000413 |
+| 4B baseline | Missing-RGB | 0.605423 +/- 0.050502 | 0.744064 +/- 0.046248 | 0.843257 +/- 0.016134 | 0.785126 +/- 0.022048 |
+| 4B baseline | Missing-NIRGB | 0.617289 +/- 0.053302 | 0.752432 +/- 0.040168 | 0.851123 +/- 0.013910 | 0.794771 +/- 0.019308 |
+| 4B baseline | Missing-SAR | 0.767399 +/- 0.018661 | 0.861825 +/- 0.015991 | 0.928077 +/- 0.003972 | 0.902833 +/- 0.005440 |
+| 4B baseline | Missing-HSI | 0.806561 +/- 0.015726 | 0.889996 +/- 0.010423 | 0.941158 +/- 0.003835 | 0.920534 +/- 0.005227 |
+| 4B baseline | Noisy-HSI | 0.853946 +/- 0.002658 | 0.919868 +/- 0.001534 | 0.955129 +/- 0.001168 | 0.939536 +/- 0.001584 |
+| 4B + PMRG | Clean | 0.866629 +/- 0.000710 | 0.927371 +/- 0.000441 | 0.960056 +/- 0.000327 | 0.946215 +/- 0.000442 |
+| 4B + PMRG | Missing-RGB | 0.602451 +/- 0.031931 | 0.739474 +/- 0.027187 | 0.843882 +/- 0.015097 | 0.782734 +/- 0.024116 |
+| 4B + PMRG | Missing-NIRGB | 0.579979 +/- 0.015668 | 0.720302 +/- 0.007832 | 0.820260 +/- 0.009039 | 0.745641 +/- 0.017087 |
+| 4B + PMRG | Missing-SAR | 0.763504 +/- 0.025531 | 0.856936 +/- 0.024132 | 0.927687 +/- 0.004071 | 0.902185 +/- 0.005821 |
+| 4B + PMRG | Missing-HSI | 0.810968 +/- 0.021727 | 0.892060 +/- 0.015420 | 0.943121 +/- 0.004565 | 0.923169 +/- 0.006388 |
+| 4B + PMRG | Noisy-HSI | 0.855560 +/- 0.002527 | 0.920868 +/- 0.001453 | 0.955649 +/- 0.001075 | 0.940237 +/- 0.001452 |
 
 ### 6.2 Clean gate statistics
 
-The clean PMRG gate statistics below report the spatial mean for the three
-feature scales. The stream order is `NIRGB | RGB | SAR | HSI`; the offset is
-relative to the uniform reference weight `0.25`.
+The clean PMRG gate statistics below report the spatial mean across the three
+seeds for the three feature scales. Values are mean +/- sample standard
+deviation, and the offset in parentheses is relative to the uniform reference
+weight `0.25`. The stream order is `NIRGB | RGB | SAR | HSI`.
 
 | Stage | NIRGB | RGB | SAR | HSI |
 |---|---:|---:|---:|---:|
-| 1/4 | 0.3321 (+0.0821) | 0.2756 (+0.0256) | 0.2097 (-0.0403) | 0.1826 (-0.0674) |
-| 1/8 | 0.4536 (+0.2036) | 0.2275 (-0.0225) | 0.1744 (-0.0756) | 0.1445 (-0.1055) |
-| 1/16 | 0.1597 (-0.0903) | 0.1419 (-0.1081) | 0.3229 (+0.0729) | 0.3755 (+0.1255) |
+| 1/4 | 0.3577 +/- 0.0349 (+0.1077) | 0.2831 +/- 0.0459 (+0.0331) | 0.1731 +/- 0.0326 (-0.0769) | 0.1860 +/- 0.0110 (-0.0640) |
+| 1/8 | 0.3572 +/- 0.0835 (+0.1072) | 0.3100 +/- 0.0749 (+0.0600) | 0.1741 +/- 0.0058 (-0.0759) | 0.1587 +/- 0.0298 (-0.0913) |
+| 1/16 | 0.1516 +/- 0.0078 (-0.0984) | 0.1526 +/- 0.0161 (-0.0974) | 0.3037 +/- 0.0503 (+0.0537) | 0.3921 +/- 0.0655 (+0.1421) |
 
-The gate values describe feature modulation, not calibrated reliability
-probabilities. In this one-seed evaluation, PMRG does not improve every
-missing-stream condition; therefore EXP-04 provides qualitative gate and
-perturbation evidence rather than a universal robustness claim.
+### 6.3 Perturbation-related gate response
+
+The table reports the mean gate change for the affected stream, averaged over
+the three seeds and three feature scales. The direction count is the number of
+seed-scale combinations with a gate decrease out of nine. A gate change is a
+feature modulation response and is not interpreted as a calibrated reliability
+probability.
+
+| Condition | Affected stream | Mean gate change | Decrease count |
+|---|---|---:|---:|
+| Missing-RGB | RGB | -0.04672 | 9/9 |
+| Missing-NIRGB | NIRGB | -0.03071 | 7/9 |
+| Missing-SAR | SAR | -0.01850 | 7/9 |
+| Missing-HSI | HSI | +0.00008 | 5/9 |
+| Noisy-HSI | HSI | +0.00083 | 2/9 |
+
+Across three seeds, PMRG improves clean mIoU by `+0.001380` and improves the
+Missing-HSI and Noisy-HSI conditions by `+0.004407` and `+0.001613` mIoU,
+respectively. It is slightly lower under Missing-RGB and Missing-SAR, and is
+substantially lower under Missing-NIRGB (`-0.037310` mIoU). Therefore EXP-04
+supports a limited feature-modulation interpretation, but not a universal
+missing- or noisy-modality robustness claim.
+
+### 6.4 Final MRSFN condition-wise results
+
+The final MRSFN configuration (`4B + PMRG + ML`) was evaluated with the same
+three seeds, validation samples, perturbation protocol, and noise realization as
+the PMRG-only experiment. This table characterizes the final model and does
+not replace the PMRG-only comparison in Sections 6.1--6.3. Values are
+mean +/- sample standard deviation over the three seeds.
+
+| Model | Condition | mIoU | F1 | Accuracy | Kappa |
+|---|---|---:|---:|---:|---:|
+| MRSFN | Clean | 0.869806 +/- 0.000500 | 0.928898 +/- 0.000291 | 0.966046 +/- 0.000342 | 0.954328 +/- 0.000469 |
+| MRSFN | Missing-RGB | 0.648370 +/- 0.050172 | 0.774750 +/- 0.040457 | 0.866632 +/- 0.032990 | 0.817523 +/- 0.043889 |
+| MRSFN | Missing-NIRGB | 0.636881 +/- 0.023468 | 0.765371 +/- 0.014625 | 0.860103 +/- 0.021648 | 0.809571 +/- 0.029037 |
+| MRSFN | Missing-SAR | 0.757041 +/- 0.020603 | 0.851171 +/- 0.018176 | 0.935279 +/- 0.001095 | 0.912576 +/- 0.001644 |
+| MRSFN | Missing-HSI | 0.802680 +/- 0.005859 | 0.886362 +/- 0.004152 | 0.948908 +/- 0.001572 | 0.931061 +/- 0.002157 |
+| MRSFN | Noisy-HSI | 0.846000 +/- 0.003318 | 0.914574 +/- 0.002010 | 0.958435 +/- 0.001364 | 0.944029 +/- 0.001845 |
+
+Relative to the same-seed 4B baseline, MRSFN improves the clean, Missing-RGB,
+and Missing-NIRGB conditions, but is lower under Missing-SAR, Missing-HSI, and
+Noisy-HSI. The final-model gate statistics and perturbation responses are
+stored with the raw outputs in `ana/exp04_repeat_mrsfn/`.
 
 ## 7. Model naming
 
