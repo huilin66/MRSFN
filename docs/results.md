@@ -94,11 +94,11 @@ also the model used as the UpderNet baseline, while the final row is MRSFN.
 ## 4. EXP-02 Backbone and capacity comparison
 
 This supplementary BW experiment compares the ConvNeXt-Tiny branch-count
-series with two larger-backbone variants. The 1B--4B rows vary the number of
-branches while using ConvNeXt-Tiny; the two EXP-02 rows keep the 1B branch
-layout and replace the backbone with ConvNeXt-Small or ConvNeXt-Base. This is
-an empirical capacity/backbone check rather than a parameter-matched causal
-comparison.
+series with larger-backbone variants. The 1B--4B rows vary the number of
+branches while using ConvNeXt-Tiny; the EXP-02 rows replace the backbone with
+ConvNeXt-Small, ConvNeXt-Base, or ConvNeXt-Large, and also test the 2B layout
+with ConvNeXt-Small. This is an empirical capacity/backbone check rather than
+a parameter-matched causal comparison.
 
 ### 4.1 BW results
 
@@ -110,6 +110,14 @@ comparison.
 | 4B | ConvNeXt-Tiny | `cxup_4b_BW` | 0.8659 | 0.9269 | 0.9598 | 0.9459 | 115.49M | 91.76G | 49.96 |
 | 1B + larger backbone | ConvNeXt-Small | `cxup_1b_BW_small_exp02` | 0.8203 | 0.8993 | 0.9410 | 0.9204 | 51.65M | 53.80G | 64.78 |
 | 1B + larger backbone | ConvNeXt-Base | `cxup_1b_BW_base_exp02` | 0.8301 | 0.9054 | 0.9454 | 0.9264 | 90.05M | 86.07G | 45.12 |
+| 1B + larger backbone | ConvNeXt-Large | `cxup_1b_BW_large_exp02` | 0.8379 | 0.9103 | 0.9493 | 0.9316 | 199.28M | 177.61G | 54.33 |
+| 2B + larger backbone | ConvNeXt-Small | `cxup_2b_BW_small_exp02` | 0.8460 | 0.9151 | 0.9520 | 0.9353 | 101.77M | 95.91G | 66.55 |
+
+The 1B-Large model has substantially more parameters and FLOPs than 4B-Tiny
+but remains lower in mIoU (0.8379 versus 0.8659). The 2B-Small model reaches
+0.8460 mIoU with lower parameter and FLOP cost than 1B-Large. These results
+support a branch/capacity interaction, but they are not an exact
+parameter-matched control and should not be used for causal attribution.
 
 ## 5. EXP-03 Repeatability
 
