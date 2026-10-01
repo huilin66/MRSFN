@@ -1,0 +1,17 @@
+_base_: 'C2Seg_BW.yml'
+
+# EXP-05 CMX baseline with two MiT-B4 streams.  The inputs remain the same as
+# the ordinary BW two-stream protocol: six MSI/SAR channels and 116 HSI
+# channels.
+model:
+  type: CMX
+  backbone:
+    type: CMXBackbone
+    in_channels1: 6
+    in_channels2: 116
+    backbone: mit_b4
+    pretrained: https://bj.bcebos.com/paddleseg/dygraph/backbone/mix_vision_transformer_b4.tar.gz
+  embedding_dim: 768
+  dropout_ratio: 0.1
+  align_corners: false
+  num_classes: 14
