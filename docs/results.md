@@ -236,22 +236,54 @@ stored with the raw outputs in `ana/exp04_repeat_mrsfn/`.
 
 ## 7. EXP-06 MSI branch control
 
-This section is reserved for the formal comparison between the current
-overlapping optical branch layout (`NIRGB | RGB`) and the non-overlapping
-four-stream layout (`RGB | NIR | SAR | HSI`). The model, data split, loss,
-training budget, and seed follow the ordinary 4B BW experiment; only the
-optical branch split changes. The 100-iteration smoke result is an execution
-check and is not reported as a formal result.
+EXP-06 is the formal non-overlapping MSI branch control. It replaces the
+overlapping optical split with four streams, `RGB | NIR | SAR | HSI`, while
+keeping the 4B backbone, data split, training protocol, and seed unchanged.
+The 100-iteration smoke test is not included as a formal result.
 
-### 7.1 BW results
+### 7.1 BW summary
 
-| Configuration | Branch layout | Technical configuration | Seed | mIoU | F1 | Accuracy | Kappa | Params | FLOPs | FPS |
-|---|---|---|---:|---:|---:|---:|---:|---:|---:|---:|
-| 4B non-overlapping MSI control | `RGB \| NIR \| SAR \| HSI` | `cxup_4b_BW_RGB_NIR_exp06` / `cxup_4b_BW_RGB_NIR.yml` | 1919810 | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
+The formal run used seed `1919810`, 40,000 training iterations, and a
+714-image validation set. The table reports the final checkpoint at
+`iter_40000`; the best validation checkpoint was selected separately by
+validation mIoU.
 
-Formal EXP-06 training and evaluation are pending. The result should be
-interpreted as a branch-layout control, not as an additional model-capacity
-comparison.
+| Configuration | Branch layout | Technical configuration | Seed | Checkpoint | mIoU | F1 | Accuracy | Kappa | Params | FLOPs | FPS |
+|---|---|---|---:|---|---:|---:|---:|---:|---:|---:|---:|
+| 4B non-overlapping MSI control | `RGB \| NIR \| SAR \| HSI` | `cxup_4b_BW_RGB_NIR_exp06` / `cxup_4b_BW_RGB_NIR.yml` | 1919810 | `iter_40000` | 0.8640 | 0.9258 | 0.9590 | 0.9447 | 115.49M | 91.74G | 56.01 |
+
+The best validation mIoU was `0.8642` at iteration `39200`, saved as
+`best_model/model.pdparams`.
+
+### 7.2 Final-checkpoint class-wise metrics
+
+The log does not provide semantic class names, so the following table keeps
+the dataset class indices.
+
+| Class index | IoU | Accuracy | F1 |
+|---:|---:|---:|---:|
+| 0 | 0.8976 | 0.9880 | 0.9460 |
+| 1 | 0.8705 | 0.9425 | 0.9308 |
+| 2 | 0.8215 | 0.8977 | 0.9020 |
+| 3 | 0.9011 | 0.9448 | 0.9480 |
+| 4 | 0.9100 | 0.9595 | 0.9529 |
+| 5 | 0.8908 | 0.9514 | 0.9422 |
+| 6 | 0.8946 | 0.9468 | 0.9444 |
+| 7 | 0.9123 | 0.9559 | 0.9541 |
+| 8 | 0.8378 | 0.9163 | 0.9118 |
+| 9 | 0.7196 | 0.8948 | 0.8369 |
+| 10 | 0.9703 | 0.9814 | 0.9849 |
+| 11 | 0.8404 | 0.9467 | 0.9133 |
+| 12 | 0.8577 | 0.9539 | 0.9234 |
+| 13 | 0.7715 | 0.9006 | 0.8710 |
+
+### 7.3 Provenance and interpretation
+
+- Remote log: `/data/huilin/projects/MRSN/log/exp06/cxup_4b_BW_RGB_NIR_20261001_214000.log`
+- Best checkpoint: `/data/huilin/projects/MRSN/output/cxup_4b_BW_RGB_NIR_exp06/best_model/model.pdparams`
+- Final checkpoint: `/data/huilin/projects/MRSN/output/cxup_4b_BW_RGB_NIR_exp06/iter_40000/model.pdparams`
+- This is a single-seed branch-layout control and should not be interpreted as a three-seed repeatability result.
+- EXP-05 CMX-B4 is still running; its formal BW/AB metrics will be added only after both runs finish.
 
 ## 8. Model naming
 
