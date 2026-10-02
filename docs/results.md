@@ -28,6 +28,7 @@ tables.
 | SegFormer | `segformer_BW` | 0.7464 | 0.8502 | 0.9051 | 0.8720 | 27.73M | 15.73G | 102.48 |
 | HighDAN | `highdan_BW` | 0.7269 | 0.8371 | 0.9098 | 0.8768 | 16.65M | 162.18G | 54.89 |
 | UpderNet | `cxup_1b_BW` | 0.8025 | 0.8878 | 0.9328 | 0.9094 | 30.01M | 31.70G | 143.93 |
+| CMX (MiT-B4) | `cmx_4b_BW` | 0.7765 | 0.8711 | 0.9231 | 0.8962 | 141.81M | 35.59G | 101.23 |
 | MRSN | `cxup_4b2h_BW` | 0.8659 | 0.9269 | 0.9595 | 0.9455 | 116.82M | 102.67G | 49.46 |
 | MRSFN | `cxup_4b_BW_PMRG_v2_lossV2` | 0.8694 | 0.9287 | 0.9658 | 0.9539 | 116.51M | 94.18G | 42.86 |
 
@@ -41,6 +42,7 @@ tables.
 | SegFormer | `segformer_AB` | 0.6140 | 0.7472 | 0.7891 | 0.7455 | 28.13M | 4.34G | 43.62 |
 | HighDAN | `highdan_AB` | 0.6423 | 0.7714 | 0.8115 | 0.7725 | 16.73M | 40.84G | 33.26 |
 | UpderNet | `cxup_1b_AB` | 0.6769 | 0.7988 | 0.8288 | 0.7939 | 30.21M | 8.12G | 50.45 |
+| CMX (MiT-B4) | `cmx_4b_AB` | 0.5831 | 0.7207 | 0.7736 | 0.7265 | 142.20M | 9.31G | 123.85 |
 | MRSN | `cxup_4b2h_AB` | 0.7657 | 0.8625 | 0.8760 | 0.8510 | 117.02M | 25.87G | 43.24 |
 | MRSFN | `cxup_4b_AB_PMRG_v2_lossV2` | 0.7571 | 0.8576 | 0.8905 | 0.8685 | 116.70M | 23.75G | 29.69 |
 
@@ -50,7 +52,25 @@ tables.
 - In AB, MRSN exceeds MRSFN by `+0.0086` mIoU.
 - The BW and AB rankings are therefore split-specific and should not be
   summarized as a universal ranking.
+- CMX is included as a single-seed MiT-B4 baseline and is not part of the
+  EXP-03 repeatability set.
 - MRSN is the legacy structure; MRSFN is the final proposed model.
+
+### 2.4 CMX provenance
+
+CMX uses MiT-B4 in both input streams and was trained once with seed
+`1919810`. The baseline rows report the best-validation checkpoints:
+`iter_39200` for BW and `iter_1440` for AB. The final checkpoints were also
+completed at `iter_40000` and `iter_1600`, respectively.
+
+- BW log: `/data/huilin/projects/MRSN/log/exp05/cmx_4b_BW/cmx_4b_BW_20261002_172339.log`
+- AB log: `/data/huilin/projects/MRSN/log/exp05/cmx_4b_AB/cmx_4b_AB_20261002_232306.log`
+- BW best checkpoint: `output/cmx_4b_BW_exp05/best_model/model.pdparams`
+- AB best checkpoint: `output/cmx_4b_AB_exp05/best_model/model.pdparams`
+
+For reference, the final-checkpoint metrics were `0.7750 / 0.8701 /
+0.9230 / 0.8961` for BW and `0.5821 / 0.7193 / 0.7741 / 0.7273` for AB
+in the order mIoU / F1 / Accuracy / Kappa.
 
 ## 3. Ablation study
 
@@ -283,7 +303,8 @@ the dataset class indices.
 - Best checkpoint: `/data/huilin/projects/MRSN/output/cxup_4b_BW_RGB_NIR_exp06/best_model/model.pdparams`
 - Final checkpoint: `/data/huilin/projects/MRSN/output/cxup_4b_BW_RGB_NIR_exp06/iter_40000/model.pdparams`
 - This is a single-seed branch-layout control and should not be interpreted as a three-seed repeatability result.
-- EXP-05 CMX-B4 is still running; its formal BW/AB metrics will be added only after both runs finish.
+- EXP-05 CMX-B4 is reported in Section 2 as a single-seed baseline; it is not
+  a repeatability experiment.
 
 ## 8. Model naming
 
