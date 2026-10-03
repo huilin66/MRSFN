@@ -4,3 +4,10 @@ model:
   type: UNet
   in_channels: 122
   num_classes: 14
+
+# Dedicated corrected city-split run: 1,855 Beijing training patches,
+# batch_size=16, and 100 full-batch epochs (115 updates per epoch).
+# Keep these values explicit here so this run remains pinned if the shared
+# city base configuration is later reused by other models.
+iters: 11500
+save_interval: 230

@@ -26,7 +26,7 @@ passed. When ``C2SEG_CITY_ROOT`` is set in ``.env``, output defaults to
 Output layout (matches ``RS_MD3B`` + ``Normalize2`` used by the PaddleCD configs):
 
     <output>/
-      train/msisar/<id>.tiff    6 ch  (MSI 4 + SAR 2)             uint16
+      train/msisar/<id>.tiff    6 ch  (MSI 4 + SAR 2)             float32
       train/hsi/<id>.tiff     116 ch                              uint16
       train/lbl/<id>.tiff       1 ch   semantic label              uint8
       train.txt                 "msi/<id>.tiff sar/<id>.tiff lbl/<id>.tiff"
@@ -44,6 +44,9 @@ official MAT sources (see ``convert_c2seg_full_mat_to_tif.py``). Patch TIFFs are
 written channel-last ``[H, W, C]`` to match how ``skimage.io.imread`` returns the
 official C2Seg-BW patches. Full-scene HSI is 0-1 reflectance; it is rescaled by
 10000 to the DN range (mean ~ 900-1000) the Normalize2 stats were computed on.
+SAR is stored as signed float32 because the source values are backscatter in
+dB and are negative. Keeping the combined MSI+SAR patch in float32 avoids
+silently clipping SAR to zero when it is written to TIFF.
 
 Example
 -------
@@ -275,6 +278,27 @@ def read_hsi_patch(reader: TiffReader, x: int, y: int, w: int, h: int,
     return hsi
 
 
+def prepare_msisar_patch(msi: np.ndarray, sar: np.ndarray) -> np.ndarray:
+    """Combine MSI and signed SAR without changing finite source values.
+
+    The official Normalize2 statistics use SAR backscatter in dB (negative
+    values, e.g. mean -15.968/-24.247). The previous uint16 conversion
+    clipped those values to zero, making the city-split input inconsistent with
+    the ordinary C2Seg-BW data. The dataset reader already converts TIFF
+    arrays to float32, so a float32 output TIFF is the lossless representation
+    for the mixed MSI+SAR stack.
+    """
+    msisar = np.concatenate([msi, sar], axis=0).astype("float32", copy=False)
+    # Non-finite source values are not expected, but keep generated datasets
+    # numerically safe without clipping valid negative SAR backscatter.
+    return np.nan_to_num(
+        msisar,
+        nan=0.0,
+        posinf=65535.0,
+        neginf=-65535.0,
+    )
+
+
 # --------------------------------------------------------------------------- #
 # Window grid
 # --------------------------------------------------------------------------- #
@@ -377,8 +401,7 @@ def build_scene_split(reader_msi, reader_sar, reader_hsi, reader_lbl,
         patch_id = f"{scene}_{x:05d}_{y:05d}"
         tifffile.imwrite(
             out_split / "msisar" / f"{patch_id}.tiff",
-            np.clip(np.concatenate([msi, sar], axis=0), 0, 65535)
-            .transpose(1, 2, 0).astype("uint16"),
+            prepare_msisar_patch(msi, sar).transpose(1, 2, 0),
         )
         tifffile.imwrite(
             out_split / "hsi" / f"{patch_id}.tiff",
