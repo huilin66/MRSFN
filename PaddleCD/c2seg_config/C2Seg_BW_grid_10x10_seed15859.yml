@@ -1,0 +1,25 @@
+_base_: 'C2Seg_BW.yml'
+
+# BW geographic-grid split generated with:
+#   python tools/build_city_split_dataset.py --grid-split --grid-seed 15859
+# The same ten validation cells are selected independently in Beijing and
+# Wuhan. Patches are generated inside one grid cell, so no patch crosses the
+# train/validation cell boundary.
+train_dataset:
+  dataset_root: ${C2SEG_CITY_ROOT}/C2SEG_BW_GRID_10X10_SEED15859/train
+  train_path:  ${C2SEG_CITY_ROOT}/C2SEG_BW_GRID_10X10_SEED15859/train.txt
+
+val_dataset:
+  dataset_root: ${C2SEG_CITY_ROOT}/C2SEG_BW_GRID_10X10_SEED15859/val
+  val_path:  ${C2SEG_CITY_ROOT}/C2SEG_BW_GRID_10X10_SEED15859/val.txt
+
+# There are 3240 training patches. With batch_size=16 and drop_last=True,
+# this gives floor(3240 / 16) = 202 updates per epoch. The full run uses
+# approximately 100 epochs, matching the existing city-split protocol.
+batch_size: 16
+iters: 20200
+save_interval: 404       # every 2 epochs
+
+# Keep the ordinary BW schedule in epoch units: 12.5 epochs per decay.
+lr_scheduler:
+  step_size: 2525        # 202 updates/epoch * 12.5 epochs

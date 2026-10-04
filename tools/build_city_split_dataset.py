@@ -537,6 +537,46 @@ def iter_windows(width: int, height: int, crop_size: list[int],
             yield x, y, min(crop_w, width - x), min(crop_h, height - y)
 
 
+def iter_grid_windows(width: int, height: int, crop_size: list[int],
+                      stride: list[int], grid_size: int,
+                      val_cells: set[int], target_split: str
+                      ) -> Iterator[tuple[int, int, int, int]]:
+    """Yield windows wholly contained in train or validation grid cells.
+
+    Windows are regenerated independently inside each grid cell. This avoids
+    assigning a patch by its center while allowing the patch to cross a
+    train/validation boundary, which would reintroduce spatial leakage.
+    """
+    if target_split not in {"train", "val"}:
+        raise ValueError(f"target_split must be train or val, got {target_split}")
+    if grid_size <= 0:
+        raise ValueError("grid_size must be positive")
+
+    crop_w, crop_h = crop_size
+    stride_w, stride_h = stride
+    x_edges = np.rint(np.linspace(0, width, grid_size + 1)).astype(int)
+    y_edges = np.rint(np.linspace(0, height, grid_size + 1)).astype(int)
+
+    for row in range(grid_size):
+        for col in range(grid_size):
+            cell_id = row * grid_size + col
+            is_val = cell_id in val_cells
+            if (target_split == "val") != is_val:
+                continue
+            x0, x1 = int(x_edges[col]), int(x_edges[col + 1])
+            y0, y1 = int(y_edges[row]), int(y_edges[row + 1])
+            cell_width = x1 - x0
+            cell_height = y1 - y0
+            for local_y in axis_starts(cell_height, crop_h, stride_h):
+                for local_x in axis_starts(cell_width, crop_w, stride_w):
+                    yield (
+                        x0 + local_x,
+                        y0 + local_y,
+                        min(crop_w, cell_width - local_x),
+                        min(crop_h, cell_height - local_y),
+                    )
+
+
 # --------------------------------------------------------------------------- #
 # HSI scaling
 # --------------------------------------------------------------------------- #
@@ -568,7 +608,9 @@ def build_scene_split(reader_msi, reader_sar, reader_hsi, reader_lbl,
                       valid_ratio: float, hsi_scale: float,
                       max_patches: int | None,
                       msi_bands, sar_bands, hsi_bands,
-                      verbose: bool = True) -> dict:
+                      verbose: bool = True,
+                      windows: Iterator[tuple[int, int, int, int]] | None = None,
+                      append_txt: bool = False) -> dict:
     """Crop patches from one city, filter, and write one split (train or val)."""
     for sub in ("msisar", "hsi", "lbl"):
         (out_split / sub).mkdir(parents=True, exist_ok=True)
@@ -577,7 +619,9 @@ def build_scene_split(reader_msi, reader_sar, reader_hsi, reader_lbl,
     kept = dropped = 0
     lines: list[str] = []
 
-    windows = list(iter_windows(reader_msi.width, reader_msi.height, crop_size, stride))
+    windows = list(windows) if windows is not None else list(
+        iter_windows(reader_msi.width, reader_msi.height, crop_size, stride)
+    )
     total = len(windows)
     if verbose:
         print(f"[{scene}] full scene {reader_msi.width}x{reader_msi.height}, "
@@ -635,7 +679,11 @@ def build_scene_split(reader_msi, reader_sar, reader_hsi, reader_lbl,
         lines.append(f"msi/{patch_id}.tiff sar/{patch_id}.tiff lbl/{patch_id}.tiff")
 
     txt_path.parent.mkdir(parents=True, exist_ok=True)
-    txt_path.write_text("\n".join(lines) + ("\n" if lines else ""), encoding="utf-8")
+    existing = ""
+    if append_txt and txt_path.is_file():
+        existing = txt_path.read_text(encoding="utf-8").rstrip()
+    chunks = [chunk for chunk in (existing, "\n".join(lines)) if chunk]
+    txt_path.write_text("\n".join(chunks) + ("\n" if chunks else ""), encoding="utf-8")
 
     stats = {
         "scene": scene,
@@ -649,6 +697,133 @@ def build_scene_split(reader_msi, reader_sar, reader_hsi, reader_lbl,
     if verbose:
         print(f"[{scene}] kept {kept} / {total} ({dropped} dropped by valid_ratio {valid_ratio:g})")
     return stats
+
+
+def merge_split_stats(scene_stats: list[dict], valid_ratio: float) -> dict:
+    """Aggregate per-scene patch statistics for one generated split."""
+    label_histo = np.zeros(NUM_CLASSES, dtype=np.int64)
+    for stats in scene_stats:
+        for index, name in enumerate(LABEL_NAMES):
+            label_histo[index] += int(stats["label_histogram"].get(name, 0))
+    return {
+        "scenes": scene_stats,
+        "candidate_windows": sum(int(stats["candidate_windows"]) for stats in scene_stats),
+        "kept_patches": sum(int(stats["kept_patches"]) for stats in scene_stats),
+        "dropped_patches": sum(int(stats["dropped_patches"]) for stats in scene_stats),
+        "valid_ratio_cutoff": valid_ratio,
+        "label_pixels": int(label_histo.sum()),
+        "label_histogram": {
+            LABEL_NAMES[index]: int(label_histo[index])
+            for index in range(NUM_CLASSES)
+        },
+    }
+
+
+def build_grid_dataset(args: argparse.Namespace, scene_root: Path,
+                       out_root: Path, val_cells: list[int]) -> None:
+    """Build one BW dataset from both scenes using a spatial grid split."""
+    existing_outputs = [out_root / name for name in ("train.txt", "val.txt", "metadata.json")]
+    if out_root.exists() and any(path.exists() for path in existing_outputs):
+        raise SystemExit(
+            f"grid output already contains generated files: {out_root}; "
+            "choose a new --output or remove the incomplete dataset explicitly"
+        )
+
+    val_cell_set = set(val_cells)
+    per_split_stats: dict[str, list[dict]] = {"train": [], "val": []}
+    scene_names = ("beijing", "wuhan")
+
+    for scene_index, scene in enumerate(scene_names):
+        msi_p = find_scene_file(scene_root, scene, "msi")
+        sar_p = find_scene_file(scene_root, scene, "sar")
+        hsi_p = find_scene_file(scene_root, scene, "hsi")
+        lbl_p = find_scene_file(scene_root, scene, "label")
+        missing = [name for path, name in (
+            (msi_p, "MSI"), (sar_p, "SAR"), (hsi_p, "HSI"), (lbl_p, "label")
+        ) if path is None]
+        if missing:
+            raise SystemExit(
+                f"[{scene}] missing from {scene_root}: {', '.join(missing)}"
+            )
+        print(f"[{scene}] grid dataset MSI={msi_p}\n"
+              f"         SAR={sar_p}\n"
+              f"         HSI={hsi_p}\n"
+              f"         label={lbl_p}")
+
+        r_msi = TiffReader(msi_p, "MSI")
+        r_sar = TiffReader(sar_p, "SAR")
+        r_hsi = TiffReader(hsi_p, "HSI")
+        r_lbl = TiffReader(lbl_p, "label")
+        if (r_sar.width, r_sar.height) != (r_msi.width, r_msi.height):
+            raise SystemExit(
+                f"[{scene}] SAR spatial size {r_sar.width}x{r_sar.height} "
+                f"does not match MSI {r_msi.width}x{r_msi.height}"
+            )
+        if (r_lbl.width, r_lbl.height) != (r_msi.width, r_msi.height):
+            raise SystemExit(
+                f"[{scene}] label spatial size {r_lbl.width}x{r_lbl.height} "
+                f"does not match MSI {r_msi.width}x{r_msi.height}"
+            )
+
+        msi_bands = args.msi_bands or list(range(1, r_msi.count + 1))
+        sar_bands = args.sar_bands or list(range(1, r_sar.count + 1))
+        hsi_bands = args.hsi_bands or list(range(1, r_hsi.count + 1))
+        hsi_scale = resolve_hsi_scale(args.hsi_scale, sample_hsi_median(r_hsi))
+        print(f"[{scene}] MSI/SAR/label={r_msi.width}x{r_msi.height}, "
+              f"HSI={r_hsi.width}x{r_hsi.height}, hsi_scale={hsi_scale:g}")
+
+        for target_split in ("train", "val"):
+            windows = iter_grid_windows(
+                r_msi.width, r_msi.height, args.crop_size, args.stride,
+                args.grid_size, val_cell_set, target_split,
+            )
+            stats = build_scene_split(
+                r_msi, r_sar, r_hsi, r_lbl, scene,
+                out_split=out_root / target_split,
+                txt_path=out_root / f"{target_split}.txt",
+                crop_size=args.crop_size, stride=args.stride,
+                valid_ratio=args.valid_ratio, hsi_scale=hsi_scale,
+                max_patches=args.max_patches,
+                msi_bands=msi_bands, sar_bands=sar_bands,
+                hsi_bands=hsi_bands,
+                windows=windows,
+                append_txt=scene_index > 0,
+            )
+            per_split_stats[target_split].append(stats)
+
+        r_msi.close()
+        r_sar.close()
+        r_hsi.close()
+        r_lbl.close()
+
+    meta = {
+        "scene_root": str(scene_root),
+        "output_root": str(out_root),
+        "argparse": vars(args),
+        "grid": {
+            "grid_size": args.grid_size,
+            "val_grid_count": args.val_grid_count,
+            "grid_seed": args.grid_seed,
+            "val_cells": [
+                {"id": cell, "row": cell // args.grid_size,
+                 "col": cell % args.grid_size}
+                for cell in val_cells
+            ],
+            "scenes": list(scene_names),
+            "patches_are_contained_in_one_cell": True,
+        },
+        "train": merge_split_stats(per_split_stats["train"], args.valid_ratio),
+        "val": merge_split_stats(per_split_stats["val"], args.valid_ratio),
+    }
+    out_root.mkdir(parents=True, exist_ok=True)
+    (out_root / "metadata.json").write_text(
+        json.dumps(meta, indent=2, ensure_ascii=False), encoding="utf-8"
+    )
+    print(
+        f"\nDone. grid seed={args.grid_seed} -> "
+        f"train={meta['train']['kept_patches']} patches, "
+        f"val={meta['val']['kept_patches']} patches -> {out_root}"
+    )
 
 
 def parse_args() -> argparse.Namespace:
@@ -687,6 +862,9 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--preview-grid", action="store_true",
                    help="Only visualize a random grid split on the original full scenes; "
                         "do not write train/val patches.")
+    p.add_argument("--grid-split", action="store_true",
+                   help="Build a BW dataset from both full scenes using the selected "
+                        "spatial grid cells as validation.")
     p.add_argument("--grid-size", type=int, default=10,
                    help="Rows and columns in the preview grid (default: 10).")
     p.add_argument("--val-grid-count", type=int, default=10,
@@ -717,6 +895,28 @@ def main() -> None:
             f"scene root not found: {scene_root}\n"
             "Pass --scene-root or point C2SEG_BW_ROOT at .../C2Seg/src/C2Seg_BW in .env."
         )
+
+    if args.preview_grid and args.grid_split:
+        raise SystemExit("--preview-grid and --grid-split are mutually exclusive")
+
+    if args.grid_split:
+        val_cells = select_val_cells(args.grid_size, args.val_grid_count, args.grid_seed)
+        if args.output:
+            grid_output = Path(args.output)
+        else:
+            city_root = env.get("C2SEG_CITY_ROOT", "") or os.environ.get(
+                "C2SEG_CITY_ROOT", ""
+            )
+            city_root = city_root.strip().strip('"').strip("'")
+            grid_output = (
+                Path(city_root) /
+                f"C2SEG_BW_GRID_{args.grid_size}X{args.grid_size}_SEED{args.grid_seed}"
+                if city_root else
+                REPO_ROOT / "data" /
+                f"C2Seg_BW_grid_{args.grid_size}x{args.grid_size}_seed{args.grid_seed}"
+            )
+        build_grid_dataset(args, scene_root, grid_output, val_cells)
+        return
 
     if args.preview_grid:
         if args.dry_run:
