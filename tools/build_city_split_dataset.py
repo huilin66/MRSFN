@@ -56,6 +56,10 @@ Example
     # swap the direction (train Wuhan, validate Beijing)
     python tools/build_city_split_dataset.py --split train_W_val_B
 
+    # preview a random 10-cell validation split on both full scenes; this writes
+    # only PNG/JSON preview files and does not build a patch dataset
+    python tools/build_city_split_dataset.py --preview-grid
+
     # keep all patches (no nodata filter), 512 stride
     python tools/build_city_split_dataset.py --valid-ratio 0 --stride 512 512
 """
@@ -86,6 +90,30 @@ LABEL_NAMES = [
     "Industrial, commercial and transport", "Mine, dump, and construction sites",
     "Artificial, vegetated areas", "Arable Land", "Permanent Crops", "Pastures",
     "Forests", "Shrub", "Open spaces with no vegetation", "Inland wetlands",
+]
+
+# The same palette is used by the full-scene conversion and thumbnail tools.
+BRIGHT_COLORS = [
+    (0, 0, 0),
+    (180, 180, 180),
+    (60, 180, 75),
+    (255, 225, 25),
+    (0, 130, 200),
+    (245, 130, 48),
+    (145, 30, 180),
+    (70, 240, 240),
+    (240, 50, 230),
+    (210, 245, 60),
+    (250, 190, 190),
+    (0, 128, 128),
+    (230, 190, 255),
+    (170, 110, 40),
+    (255, 250, 200),
+    (128, 0, 0),
+    (170, 255, 195),
+    (128, 128, 0),
+    (255, 215, 180),
+    (0, 0, 128),
 ]
 
 # Geographic direction -> (train_scene, val_scene).  B = Beijing, W = Wuhan.
@@ -232,6 +260,191 @@ class TiffReader:
 
     def close(self) -> None:
         pass
+
+
+def hsv_to_rgb_uint8(hue: int, saturation: float, value: float) -> tuple[int, int, int]:
+    c = value * saturation
+    x = c * (1 - abs((hue / 60) % 2 - 1))
+    m = value - c
+    if hue < 60:
+        r, g, b = c, x, 0
+    elif hue < 120:
+        r, g, b = x, c, 0
+    elif hue < 180:
+        r, g, b = 0, c, x
+    elif hue < 240:
+        r, g, b = 0, x, c
+    elif hue < 300:
+        r, g, b = x, 0, c
+    else:
+        r, g, b = c, 0, x
+    return int((r + m) * 255), int((g + m) * 255), int((b + m) * 255)
+
+
+def build_label_palette(num_classes: int = 256) -> np.ndarray:
+    """Return the project pseudo-color palette as an RGB lookup table."""
+    colors = []
+    for class_id in range(num_classes):
+        if class_id < len(BRIGHT_COLORS):
+            colors.append(BRIGHT_COLORS[class_id])
+        else:
+            colors.append(hsv_to_rgb_uint8((class_id * 47) % 360, 0.82, 1.0))
+    return np.asarray(colors, dtype=np.uint8)
+
+
+def scale_preview_band(arr: np.ndarray, pmin: float = 2.0,
+                       pmax: float = 98.0) -> np.ndarray:
+    """Percentile-stretch one preview band to uint8 without loading extra data."""
+    arr = np.asarray(arr, dtype="float32")
+    valid = np.isfinite(arr)
+    if not np.any(valid):
+        return np.zeros(arr.shape, dtype=np.uint8)
+    lo, hi = np.percentile(arr[valid], [pmin, pmax])
+    if hi <= lo:
+        hi = lo + 1.0
+    stretched = np.clip((arr - lo) / (hi - lo), 0.0, 1.0)
+    return (stretched * 255.0).astype(np.uint8)
+
+
+def preview_step(height: int, width: int, max_dim: int) -> int:
+    if max_dim <= 0:
+        raise ValueError("preview_max_dim must be positive")
+    return max(1, int(np.ceil(max(height, width) / max_dim)))
+
+
+def read_preview(reader: TiffReader, step: int,
+                 bands: list[int] | None = None) -> np.ndarray:
+    """Read a downsampled preview, preserving channel-first layout when needed."""
+    if reader.axis is None:
+        return np.asarray(reader.array[::step, ::step])
+
+    indices = [band - 1 for band in bands] if bands else None
+    if reader.axis == 0:
+        if indices is not None:
+            block = reader.array[indices, ::step, ::step]
+        else:
+            block = reader.array[:, ::step, ::step]
+        return np.asarray(block)
+
+    if indices is not None:
+        block = reader.array[::step, ::step, indices]
+        return np.transpose(np.asarray(block), (2, 0, 1))
+    block = reader.array[::step, ::step, :]
+    return np.transpose(np.asarray(block), (2, 0, 1))
+
+
+def make_rgb_preview(reader: TiffReader, rgb_bands: list[int],
+                     max_dim: int) -> tuple[np.ndarray, int]:
+    """Build an RGB preview from 1-based MSI band indices."""
+    if len(rgb_bands) != 3:
+        raise ValueError("preview RGB requires exactly three MSI bands")
+    if any(band < 1 or band > reader.count for band in rgb_bands):
+        raise ValueError(
+            f"preview RGB bands {rgb_bands} exceed MSI band count {reader.count}")
+    step = preview_step(reader.height, reader.width, max_dim)
+    sampled = read_preview(reader, step, rgb_bands)
+    rgb = np.stack([scale_preview_band(sampled[i]) for i in range(3)], axis=-1)
+    return rgb, step
+
+
+def make_label_preview(reader: TiffReader, step: int) -> np.ndarray:
+    """Convert a downsampled raw label image to the project GT colors."""
+    labels = read_preview(reader, step)
+    labels = np.where(np.isfinite(labels), labels, 0).astype(np.int64)
+    labels = np.where(labels < 0, 0, labels) % 256
+    return build_label_palette(256)[labels]
+
+
+def select_val_cells(grid_size: int, val_count: int, seed: int) -> list[int]:
+    """Select row-major grid-cell IDs for validation using a fixed seed."""
+    if grid_size <= 0:
+        raise ValueError("grid_size must be positive")
+    total = grid_size * grid_size
+    if val_count < 0 or val_count > total:
+        raise ValueError(f"val_grid_count must be in [0, {total}]")
+    rng = np.random.default_rng(seed)
+    return sorted(int(i) for i in rng.choice(total, size=val_count, replace=False))
+
+
+def draw_grid_overlay(image: np.ndarray, grid_size: int,
+                      val_cells: set[int]) -> np.ndarray:
+    """Draw grid boundaries and translucent validation cells on an RGB image."""
+    canvas = image.copy()
+    height, width = canvas.shape[:2]
+    x_edges = np.rint(np.linspace(0, width, grid_size + 1)).astype(int)
+    y_edges = np.rint(np.linspace(0, height, grid_size + 1)).astype(int)
+    val_color = np.asarray((225, 45, 45), dtype=np.float32)
+
+    for row in range(grid_size):
+        for col in range(grid_size):
+            cell_id = row * grid_size + col
+            x0, x1 = x_edges[col], x_edges[col + 1]
+            y0, y1 = y_edges[row], y_edges[row + 1]
+            if cell_id in val_cells and x1 > x0 and y1 > y0:
+                region = canvas[y0:y1, x0:x1].astype(np.float32)
+                canvas[y0:y1, x0:x1] = (
+                    region * 0.62 + val_color * 0.38
+                ).astype(np.uint8)
+                cv2.rectangle(canvas, (x0, y0), (max(x0, x1 - 1), max(y0, y1 - 1)),
+                              (255, 35, 35), 3)
+                cv2.putText(canvas, f"V{cell_id:02d}", (x0 + 8, y0 + 24),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.65, (255, 255, 255), 2,
+                            cv2.LINE_AA)
+            else:
+                cv2.rectangle(canvas, (x0, y0), (max(x0, x1 - 1), max(y0, y1 - 1)),
+                              (20, 20, 20), 1)
+    return canvas
+
+
+def add_preview_caption(image: np.ndarray, caption: str) -> np.ndarray:
+    """Add a small readable caption above one preview panel."""
+    height, width = image.shape[:2]
+    header = np.full((38, width, 3), 245, dtype=np.uint8)
+    cv2.putText(header, caption, (10, 25), cv2.FONT_HERSHEY_SIMPLEX, 0.7,
+                (20, 20, 20), 2, cv2.LINE_AA)
+    return np.concatenate([header, image], axis=0)
+
+
+def save_rgb_png(path: Path, image: np.ndarray) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if not cv2.imwrite(str(path), cv2.cvtColor(image, cv2.COLOR_RGB2BGR)):
+        raise RuntimeError(f"failed to write preview image: {path}")
+
+
+def visualize_scene_grid(reader_msi: TiffReader, reader_lbl: TiffReader,
+                         scene: str, output_dir: Path, grid_size: int,
+                         val_cells: set[int], rgb_bands: list[int],
+                         max_dim: int) -> dict:
+    """Write RGB, GT-color, and side-by-side grid previews for one scene."""
+    if (reader_lbl.width, reader_lbl.height) != (reader_msi.width, reader_msi.height):
+        raise ValueError(
+            f"[{scene}] label size {reader_lbl.width}x{reader_lbl.height} does not match "
+            f"MSI {reader_msi.width}x{reader_msi.height}"
+        )
+    rgb, step = make_rgb_preview(reader_msi, rgb_bands, max_dim)
+    gt_color = make_label_preview(reader_lbl, step)
+    rgb_grid = draw_grid_overlay(rgb, grid_size, val_cells)
+    gt_grid = draw_grid_overlay(gt_color, grid_size, val_cells)
+    pair = np.concatenate([
+        add_preview_caption(rgb_grid, "Original MSI RGB; red cells = validation"),
+        add_preview_caption(gt_grid, "GT color; red cells = validation"),
+    ], axis=1)
+
+    save_rgb_png(output_dir / f"{scene}_grid_rgb.png", rgb_grid)
+    save_rgb_png(output_dir / f"{scene}_grid_gt_color.png", gt_grid)
+    save_rgb_png(output_dir / f"{scene}_grid_pair.png", pair)
+    return {
+        "scene": scene,
+        "source_size": [reader_msi.width, reader_msi.height],
+        "preview_size": [int(rgb.shape[1]), int(rgb.shape[0])],
+        "downsample_step": step,
+        "rgb_bands_1_based": rgb_bands,
+        "files": [
+            f"{scene}_grid_rgb.png",
+            f"{scene}_grid_gt_color.png",
+            f"{scene}_grid_pair.png",
+        ],
+    }
 
 
 def resize_chw(arr: np.ndarray, out_hw: tuple[int, int]) -> np.ndarray:
@@ -471,6 +684,25 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--msi-bands", nargs="+", type=int, default=None)
     p.add_argument("--sar-bands", nargs="+", type=int, default=None)
     p.add_argument("--hsi-bands", nargs="+", type=int, default=None)
+    p.add_argument("--preview-grid", action="store_true",
+                   help="Only visualize a random grid split on the original full scenes; "
+                        "do not write train/val patches.")
+    p.add_argument("--grid-size", type=int, default=10,
+                   help="Rows and columns in the preview grid (default: 10).")
+    p.add_argument("--val-grid-count", type=int, default=10,
+                   help="Number of randomly selected validation cells (default: 10).")
+    p.add_argument("--grid-seed", type=int, default=1919810,
+                   help="Random seed for selecting validation cells.")
+    p.add_argument("--preview-scene", choices=("beijing", "wuhan", "both"),
+                   default="both",
+                   help="Scene(s) to preview (default: both).")
+    p.add_argument("--preview-output", default="",
+                   help="Preview output directory. Default: ana/grid_preview_<size>x<size>_seed<seed>.")
+    p.add_argument("--preview-max-dim", type=int, default=1800,
+                   help="Longest edge of each preview image (default: 1800).")
+    p.add_argument("--preview-rgb-bands", nargs=3, type=int, default=[1, 2, 3],
+                   metavar=("R", "G", "B"),
+                   help="1-based MSI bands used for the original RGB preview (default: 1 2 3).")
     p.add_argument("--dry-run", action="store_true",
                    help="Scan and report, but write no patches.")
     return p.parse_args()
@@ -485,6 +717,71 @@ def main() -> None:
             f"scene root not found: {scene_root}\n"
             "Pass --scene-root or point C2SEG_BW_ROOT at .../C2Seg/src/C2Seg_BW in .env."
         )
+
+    if args.preview_grid:
+        if args.dry_run:
+            raise SystemExit("--preview-grid and --dry-run are mutually exclusive")
+        val_cells = select_val_cells(args.grid_size, args.val_grid_count, args.grid_seed)
+        preview_scenes = {
+            "beijing": ["beijing"],
+            "wuhan": ["wuhan"],
+            "both": ["beijing", "wuhan"],
+        }[args.preview_scene]
+        preview_root = (
+            Path(args.preview_output)
+            if args.preview_output
+            else REPO_ROOT / "ana" /
+            f"grid_preview_{args.grid_size}x{args.grid_size}_seed{args.grid_seed}"
+        )
+        preview_meta: dict = {
+            "scene_root": str(scene_root),
+            "output_root": str(preview_root),
+            "grid_size": args.grid_size,
+            "val_grid_count": args.val_grid_count,
+            "grid_seed": args.grid_seed,
+            "val_cells": [
+                {"id": cell, "row": cell // args.grid_size,
+                 "col": cell % args.grid_size}
+                for cell in val_cells
+            ],
+            "preview_scene": args.preview_scene,
+            "scenes": [],
+        }
+        val_cell_set = set(val_cells)
+
+        for scene in preview_scenes:
+            msi_p = find_scene_file(scene_root, scene, "msi")
+            lbl_p = find_scene_file(scene_root, scene, "label")
+            if msi_p is None or lbl_p is None:
+                missing = []
+                if msi_p is None:
+                    missing.append("MSI")
+                if lbl_p is None:
+                    missing.append("label")
+                raise SystemExit(
+                    f"[{scene}] missing from {scene_root}: {', '.join(missing)}"
+                )
+            print(f"[{scene}] preview MSI={msi_p}\n"
+                  f"         label={lbl_p}")
+            r_msi = TiffReader(msi_p, "MSI")
+            r_lbl = TiffReader(lbl_p, "label")
+            preview_meta["scenes"].append(
+                visualize_scene_grid(
+                    r_msi, r_lbl, scene, preview_root, args.grid_size,
+                    val_cell_set, args.preview_rgb_bands, args.preview_max_dim,
+                )
+            )
+            r_msi.close()
+            r_lbl.close()
+
+        preview_root.mkdir(parents=True, exist_ok=True)
+        (preview_root / "grid_assignment.json").write_text(
+            json.dumps(preview_meta, indent=2, ensure_ascii=False),
+            encoding="utf-8",
+        )
+        print(f"\nGrid preview written to {preview_root}")
+        print(f"Validation cells: {val_cells}")
+        return
 
     out_root = resolve_output_root(args.output, env, args.split)
     meta: dict = {

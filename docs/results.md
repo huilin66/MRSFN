@@ -76,6 +76,9 @@ in the order mIoU / F1 / Accuracy / Kappa.
 
 The ablation study separates branch capacity, PMRG, and ML. The `1B` row is
 also the model used as the UpderNet baseline, while the final row is MRSFN.
+Unless explicitly noted otherwise, the tables in this section report the
+single-seed best-validation result. EXP-06 uses its original seed `1919810`
+here; its three-seed repeatability summary is reported in Section 5.
 
 ### 3.1 BW results
 
@@ -85,6 +88,7 @@ also the model used as the UpderNet baseline, while the final row is MRSFN.
 | 2B | `cxup_2b_BW` | 0.8342 | 0.9079 | 0.9470 | 0.9286 | 58.50M | 51.71G | 104.47 |
 | 3B | `cxup_3b_BW` | 0.8496 | 0.9173 | 0.9537 | 0.9377 | 87.00M | 71.73G | 85.27 |
 | 4B | `cxup_4b_BW` | 0.8659 | 0.9269 | 0.9598 | 0.9459 | 115.49M | 91.76G | 49.96 |
+| 4B non-overlapping MSI (EXP-06) | `cxup_4b_BW_RGB_NIR_exp06` | 0.8642 | 0.9259 | 0.9590 | 0.9448 | 115.49M | 91.74G | 56.01 |
 | 4B + PMRG | `cxup_4b_BW_PMRG_v2` | 0.8671 | 0.9277 | 0.9602 | 0.9465 | 116.51M | 94.18G | 41.42 |
 | 4B + ML | `cxup_4b_BW_lossV2` | 0.8684 | 0.9281 | 0.9656 | 0.9537 | 115.49M | 91.76G | 51.61 |
 | 4B + PMRG + ML / MRSFN | `cxup_4b_BW_PMRG_v2_lossV2` | 0.8694 | 0.9287 | 0.9658 | 0.9539 | 116.51M | 94.18G | 42.86 |
@@ -103,6 +107,8 @@ also the model used as the UpderNet baseline, while the final row is MRSFN.
 
 ### 3.3 Ablation interpretation
 
+- The EXP-06 rows above use the original seed `1919810`; the three-seed mean ±
+  sample standard deviation is reported separately in Section 5.
 - BW shows a monotonic improvement from 1B through 4B.
 - In BW, PMRG and ML both improve the 4B result, with the complete MRSFN
   configuration giving the highest mIoU in this table.
@@ -141,25 +147,28 @@ parameter-matched control and should not be used for causal attribution.
 
 ## 5. EXP-03 Repeatability
 
-The following values are calculated over seeds `1919810`, `1919811`, and
+The EXP-03 rows below are calculated over seeds `1919810`, `1919811`, and
 `1919812`. Seed `1919810` comes from the original `output_bw/` checkpoints;
 seeds `1919811` and `1919812` come from the `output/exp03_*` checkpoints. Each
-seed contributes the metrics of its best-validation checkpoint. Values are
-reported as mean ± sample standard deviation and are limited to the BW
-repeatability experiment.
+seed contributes the metrics of its best-validation checkpoint. EXP-06 adds a
+separate three-seed BW repeatability result for the non-overlapping
+`RGB | NIR | SAR | HSI` branch layout.
 
-| Configuration | mIoU (mean ± std) | F1 (mean ± std) | Accuracy (mean ± std) | Kappa (mean ± std) |
-|---|---:|---:|---:|---:|
-| 1B / UpderNet | 0.8011 ± 0.0013 | 0.8870 ± 0.0008 | 0.9324 ± 0.0004 | 0.9089 ± 0.0005 |
-| 2B | 0.8337 ± 0.0006 | 0.9075 ± 0.0004 | 0.9468 ± 0.0004 | 0.9283 ± 0.0006 |
-| 3B | 0.8507 ± 0.0010 | 0.9180 ± 0.0006 | 0.9538 ± 0.0001 | 0.9378 ± 0.0002 |
-| 4B | 0.8653 ± 0.0006 | 0.9265 ± 0.0004 | 0.9596 ± 0.0003 | 0.9456 ± 0.0004 |
-| 4B + PMRG | 0.8666 ± 0.0007 | 0.9274 ± 0.0004 | 0.9601 ± 0.0003 | 0.9462 ± 0.0005 |
-| 4B + ML | 0.8691 ± 0.0006 | 0.9284 ± 0.0003 | 0.9657 ± 0.0002 | 0.9539 ± 0.0003 |
-| 4B + PMRG + ML / MRSFN | 0.8698 ± 0.0005 | 0.9289 ± 0.0003 | 0.9661 ± 0.0003 | 0.9543 ± 0.0005 |
+| Dataset | Configuration | mIoU (mean ± std) | F1 (mean ± std) | Accuracy (mean ± std) | Kappa (mean ± std) |
+|---|---|---:|---:|---:|---:|
+| BW | 1B / UpderNet | 0.8011 ± 0.0013 | 0.8870 ± 0.0008 | 0.9324 ± 0.0004 | 0.9089 ± 0.0005 |
+| BW | 2B | 0.8337 ± 0.0006 | 0.9075 ± 0.0004 | 0.9468 ± 0.0004 | 0.9283 ± 0.0006 |
+| BW | 3B | 0.8507 ± 0.0010 | 0.9180 ± 0.0006 | 0.9538 ± 0.0001 | 0.9378 ± 0.0002 |
+| BW | 4B | 0.8653 ± 0.0006 | 0.9265 ± 0.0004 | 0.9596 ± 0.0003 | 0.9456 ± 0.0004 |
+| BW | 4B + PMRG | 0.8666 ± 0.0007 | 0.9274 ± 0.0004 | 0.9601 ± 0.0003 | 0.9462 ± 0.0005 |
+| BW | 4B + ML | 0.8691 ± 0.0006 | 0.9284 ± 0.0003 | 0.9657 ± 0.0002 | 0.9539 ± 0.0003 |
+| BW | 4B + PMRG + ML / MRSFN | 0.8698 ± 0.0005 | 0.9289 ± 0.0003 | 0.9661 ± 0.0003 | 0.9543 ± 0.0005 |
+| BW | 4B non-overlapping MSI / EXP-06 | 0.8627 ± 0.0013 | 0.9250 ± 0.0008 | 0.9586 ± 0.0004 | 0.9442 ± 0.0005 |
 
 The repeatability table is reported separately from the single-seed BW and AB
-tables above and should be used for stability claims.
+tables above and should be used for stability claims. EXP-06 uses
+`cxup_4b_BW_RGB_NIR_exp06` for the original BW run and the two additional
+BW seed-specific outputs under `output/exp06_*`.
 
 ## 6. EXP-04 PMRG evidence experiment
 
@@ -302,7 +311,8 @@ the dataset class indices.
 - Remote log: `/data/huilin/projects/MRSN/log/exp06/cxup_4b_BW_RGB_NIR_20261001_214000.log`
 - Best checkpoint: `/data/huilin/projects/MRSN/output/cxup_4b_BW_RGB_NIR_exp06/best_model/model.pdparams`
 - Final checkpoint: `/data/huilin/projects/MRSN/output/cxup_4b_BW_RGB_NIR_exp06/iter_40000/model.pdparams`
-- This is a single-seed branch-layout control and should not be interpreted as a three-seed repeatability result.
+- This subsection records the original single-seed formal run; the completed
+  three-seed BW repeatability results are summarized in Sections 3 and 5.
 - EXP-05 CMX-B4 is reported in Section 2 as a single-seed baseline; it is not
   a repeatability experiment.
 
