@@ -3,7 +3,7 @@
 This repository provides the PaddlePaddle/PaddleSeg implementation for MRSFN and the MRSN work:
 
 - **MRSFN: A Multimodal Remote-Sensing Fusion Network for Semantic Segmentation**.
-- **Multimodal remote sensing network**, the top 3 solution for WHISPERS 2023 challenge.
+- **[Multimodal remote sensing network](https://ieeexplore.ieee.org/abstract/document/10430584)**, the top 3 solution for WHISPERS 2023 challenge.
 
 
 
