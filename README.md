@@ -63,9 +63,7 @@ The `.env` file is ignored by git so private dataset paths are not published.
 
 ## Geographic-Leakage Experiment (City-Level Split)
 
-A reviewer concern was that the default random patch split can leak geography
-between train/val (patches from the same full scene land in both sets). To
-evaluate this, a **geographically disjoint** split can be built with
+To evaluate geographic generalization without spatial overlap between training and validation samples, we provide a city-disjoint data preparation script. To evaluate this, a **geographically disjoint** split can be built with
 
 ```bash
 python tools/build_city_split_dataset.py --split train_B_val_W
