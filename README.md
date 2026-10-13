@@ -1,17 +1,13 @@
 # MRSFN / MRSN
 
-This repository provides the PaddlePaddle/PaddleSeg implementation for the current
-MRSFN extension and the earlier MRSN multimodal remote sensing semantic
-segmentation work:
+This repository provides the PaddlePaddle/PaddleSeg implementation for MRSFN and the MRSN work:
 
-- **MRSFN**, the current multi-branch extension with Pixel-wise Modality Reliability Gate (PMRG) and mixed loss.
-- **MRSN (Multimodal Remote Sensing Network)**, the earlier WHISPERS 2023 model and baseline.
+- **MRSFN: A Multimodal Remote-Sensing Fusion Network for Semantic Segmentation**.
+- **Multimodal remote sensing network**, the top 3 solution for WHISPERS 2023 challenge.
 
-The code supports training, validation, prediction, and experimental analysis on the C2Seg-BW multimodal remote sensing segmentation setting.
 
-MRSFN continues the earlier MRSN work. The original MRSN repository is
-[huilin16/MRSN](https://github.com/huilin16/MRSN), while this repository contains
-the current MRSFN extension at [huilin66/MRSFN](https://github.com/huilin66/MRSFN).
+
+MRSFN continues the earlier MRSN work. The original MRSN repository is [huilin16/MRSN](https://github.com/huilin16/MRSN).
 
 ## Repository Layout
 
