@@ -13,6 +13,9 @@ tables.
 - `val_ab2` is retained as a separate AB evaluation pass and is not mixed into
   the main AB tables.
 - Checkpoint: `best_model/model.pdparams`.
+- For reported accuracy tables, mIoU, F1, accuracy, and Kappa are all taken
+  from the checkpoint with the highest validation mIoU; the other metrics are
+  not selected independently.
 - Metrics: mIoU, F1, accuracy, and Kappa.
 - FPS is reported as logged and is dependent on hardware and runtime state.
 
@@ -273,44 +276,23 @@ The 100-iteration smoke test is not included as a formal result.
 ### 7.1 BW summary
 
 The formal run used seed `1919810`, 40,000 training iterations, and a
-714-image validation set. The table reports the final checkpoint at
-`iter_40000`; the best validation checkpoint was selected separately by
-validation mIoU.
+714-image validation set. The table reports the best-validation checkpoint,
+selected by validation mIoU. All four accuracy metrics are taken from that
+same checkpoint.
 
 | Configuration | Branch layout | Technical configuration | Seed | Checkpoint | mIoU | F1 | Accuracy | Kappa | Params | FLOPs | FPS |
 |---|---|---|---:|---|---:|---:|---:|---:|---:|---:|---:|
-| 4B non-overlapping MSI control | `RGB \| NIR \| SAR \| HSI` | `cxup_4b_BW_RGB_NIR_exp06` / `cxup_4b_BW_RGB_NIR.yml` | 1919810 | `iter_40000` | 0.8640 | 0.9258 | 0.9590 | 0.9447 | 115.49M | 91.74G | 56.01 |
+| 4B non-overlapping MSI control | `RGB \| NIR \| SAR \| HSI` | `cxup_4b_BW_RGB_NIR_exp06` / `cxup_4b_BW_RGB_NIR.yml` | 1919810 | `iter_39200` | 0.8642 | 0.9259 | 0.9590 | 0.9448 | 115.49M | 91.74G | 56.01 |
 
 The best validation mIoU was `0.8642` at iteration `39200`, saved as
 `best_model/model.pdparams`.
 
-### 7.2 Final-checkpoint class-wise metrics
-
-The log does not provide semantic class names, so the following table keeps
-the dataset class indices.
-
-| Class index | IoU | Accuracy | F1 |
-|---:|---:|---:|---:|
-| 0 | 0.8976 | 0.9880 | 0.9460 |
-| 1 | 0.8705 | 0.9425 | 0.9308 |
-| 2 | 0.8215 | 0.8977 | 0.9020 |
-| 3 | 0.9011 | 0.9448 | 0.9480 |
-| 4 | 0.9100 | 0.9595 | 0.9529 |
-| 5 | 0.8908 | 0.9514 | 0.9422 |
-| 6 | 0.8946 | 0.9468 | 0.9444 |
-| 7 | 0.9123 | 0.9559 | 0.9541 |
-| 8 | 0.8378 | 0.9163 | 0.9118 |
-| 9 | 0.7196 | 0.8948 | 0.8369 |
-| 10 | 0.9703 | 0.9814 | 0.9849 |
-| 11 | 0.8404 | 0.9467 | 0.9133 |
-| 12 | 0.8577 | 0.9539 | 0.9234 |
-| 13 | 0.7715 | 0.9006 | 0.8710 |
-
-### 7.3 Provenance and interpretation
+### 7.2 Provenance and interpretation
 
 - Remote log: `/data/huilin/projects/MRSN/log/exp06/cxup_4b_BW_RGB_NIR_20261001_214000.log`
 - Best checkpoint: `/data/huilin/projects/MRSN/output/cxup_4b_BW_RGB_NIR_exp06/best_model/model.pdparams`
-- Final checkpoint: `/data/huilin/projects/MRSN/output/cxup_4b_BW_RGB_NIR_exp06/iter_40000/model.pdparams`
+- The final `iter_40000` checkpoint is retained as a training artifact but is
+  not used for the reported EXP-06 accuracy metrics.
 - This subsection records the original single-seed formal run; the completed
   three-seed BW repeatability results are summarized in Sections 3 and 5.
 - EXP-05 CMX-B4 is reported in Section 2 as a single-seed baseline; it is not
@@ -357,18 +339,21 @@ epochs), and seed `1919810`.
 The table reports the best validation mIoU and, separately, the metrics from
 the final `iter_11500` checkpoint. This distinction is kept because the city
 validation performance did not necessarily peak at the final iteration.
+The table reports the best-validation checkpoint for each model. All four
+accuracy metrics are taken from that same checkpoint, selected by validation
+mIoU.
 
-| Model | Configuration | Best checkpoint | Best mIoU | Final checkpoint | Final mIoU | Final F1 | Final Accuracy | Final Kappa | Params | FLOPs | FPS |
-|---|---|---:|---:|---|---:|---:|---:|---:|---:|---:|---:|
-| U-Net | `unet_BW_city.yml` | `iter_11040` | 0.0787 | `iter_11500` | 0.0771 | 0.1157 | 0.2769 | 0.1912 | 13.48M | 36.02G | 121.08 |
-| DeepLab | `deeplabv3p_BW_city.yml` | `iter_3910` | 0.0707 | `iter_11500` | 0.0629 | 0.1005 | 0.2466 | 0.1502 | 26.83M | 29.11G | 220.93 |
-| OCRNet | `ocrnet_BW_city.yml` | `iter_5060` | 0.0434 | `iter_11500` | 0.0424 | 0.0708 | 0.2183 | 0.0874 | 12.19M | 14.41G | 139.62 |
-| SegFormer | `segformer_BW_city.yml` | `iter_4140` | 0.0613 | `iter_11500` | 0.0588 | 0.0955 | 0.2434 | 0.1490 | 27.73M | 15.73G | 178.93 |
-| HighDAN | `highdan_BW_city.yml` | `iter_460` | 0.0826 | `iter_11500` | 0.0659 | 0.1046 | 0.2782 | 0.1646 | 16.65M | 162.18G | 25.07 |
-| 1B / UpderNet | `cxup_1b_BW_city.yml` | `iter_4830` | 0.0682 | `iter_11500` | 0.0636 | 0.1031 | 0.2497 | 0.1528 | 30.01M | 31.70G | 95.00 |
-| CMX (MiT-B4) | `cmx_4b_BW_city.yml` | `iter_3220` | 0.1037 | `iter_11500` | 0.0925 | 0.1451 | 0.3036 | 0.2127 | 141.81M | 35.59G | 26.41 |
-| MRSN | `MRSN_BW_city.yml` | `iter_11270` | 0.1283 | `iter_11500` | 0.1271 | 0.1934 | 0.3957 | 0.3065 | 116.82M | 102.67G | 27.19 |
-| MRSFN | `cxup_4b_BW_PMRG_ML_city.yml` | `iter_460` | 0.1510 | `iter_11500` | 0.1293 | 0.1970 | 0.3890 | 0.3047 | 116.51M | 94.18G | 51.15 |
+| Model | Configuration | Best checkpoint | mIoU | F1 | Accuracy | Kappa | Params | FLOPs | FPS |
+|---|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| U-Net | `unet_BW_city.yml` | `iter_11040` | 0.0787 | 0.1177 | 0.2831 | 0.1958 | 13.48M | 36.02G | 121.08 |
+| DeepLab | `deeplabv3p_BW_city.yml` | `iter_3910` | 0.0707 | 0.1121 | 0.2690 | 0.1749 | 26.83M | 29.11G | 220.93 |
+| OCRNet | `ocrnet_BW_city.yml` | `iter_5060` | 0.0434 | 0.0705 | 0.2167 | 0.1004 | 12.19M | 14.41G | 139.62 |
+| SegFormer | `segformer_BW_city.yml` | `iter_4140` | 0.0613 | 0.0995 | 0.2333 | 0.1469 | 27.73M | 15.73G | 178.93 |
+| HighDAN | `highdan_BW_city.yml` | `iter_460` | 0.0826 | 0.1211 | 0.2921 | 0.2068 | 16.65M | 162.18G | 25.07 |
+| 1B / UpderNet | `cxup_1b_BW_city.yml` | `iter_4830` | 0.0682 | 0.1104 | 0.2489 | 0.1563 | 30.01M | 31.70G | 95.00 |
+| CMX (MiT-B4) | `cmx_4b_BW_city.yml` | `iter_3220` | 0.1037 | 0.1582 | 0.3273 | 0.2399 | 141.81M | 35.59G | 26.41 |
+| MRSN | `MRSN_BW_city.yml` | `iter_11270` | 0.1283 | 0.1947 | 0.4004 | 0.3109 | 116.82M | 102.67G | 27.19 |
+| MRSFN | `cxup_4b_BW_PMRG_ML_city.yml` | `iter_460` | 0.1510 | 0.2228 | 0.4477 | 0.3642 | 116.51M | 94.18G | 51.15 |
 
 The corresponding remote output directories follow the pattern
 `output/<configuration>_train_B_val_W`; they include the original U-Net,
@@ -381,9 +366,10 @@ trained from scratch after MRSN finished.
 These results provide a geographic-independence check using a whole-city
 holdout. They should not be combined numerically with the ordinary BW table,
 because the validation distribution and split construction are different. The
-city-split ranking is MRSFN (0.1510), MRSN (0.1283), CMX (0.1037), HighDAN
-(0.0826), U-Net (0.0787), DeepLab (0.0707), 1B/UpderNet (0.0682), SegFormer
-(0.0613), and OCRNet (0.0434) by best validation mIoU.
+city-split ranking by best-validation mIoU is MRSFN (0.1510), MRSN (0.1283),
+CMX (0.1037), HighDAN (0.0826), U-Net (0.0787), DeepLab (0.0707),
+1B/UpderNet (0.0682), SegFormer (0.0613), and OCRNet (0.0434). The same
+best-validation checkpoints are used for F1, accuracy, and Kappa.
 
 ### 8.3 10x10 grid split (EXP-11)
 
@@ -408,12 +394,15 @@ cities, not a city-disjoint split.
 The table reports the best validation mIoU and, separately, the metrics from
 the final `iter_20200` checkpoint. The three models were trained serially on
 the same grid split.
+The table reports the best-validation checkpoint for each model. All four
+accuracy metrics are taken from that same checkpoint, selected by validation
+mIoU. The three models were trained serially on the same grid split.
 
-| Model | Configuration | Best checkpoint | Best mIoU | Final checkpoint | Final mIoU | Final F1 | Final Accuracy | Final Kappa | Params | FLOPs | FPS |
-|---|---|---:|---:|---|---:|---:|---:|---:|---:|---:|---:|
-| U-Net | `unet_BW_grid_10x10_seed15859.yml` | `iter_3636` | 0.3391 | `iter_20200` | 0.3087 | 0.4333 | 0.6531 | 0.5785 | 13.48M | 36.02G | 353.81 |
-| 1B / UpderNet | `cxup_1b_BW_grid_10x10_seed15859.yml` | `iter_808` | 0.3129 | `iter_20200` | 0.2656 | 0.3757 | 0.6289 | 0.5472 | 30.01M | 31.70G | 267.82 |
-| MRSFN | `cxup_4b_BW_PMRG_ML_grid_10x10_seed15859.yml` | `iter_1212` | 0.3443 | `iter_20200` | 0.3090 | 0.4316 | 0.6606 | 0.5882 | 116.51M | 94.18G | 52.71 |
+| Model | Configuration | Best checkpoint | mIoU | F1 | Accuracy | Kappa | Params | FLOPs | FPS |
+|---|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| U-Net | `unet_BW_grid_10x10_seed15859.yml` | `iter_3636` | 0.3391 | 0.4768 | 0.6586 | 0.5908 | 13.48M | 36.02G | 353.81 |
+| 1B / UpderNet | `cxup_1b_BW_grid_10x10_seed15859.yml` | `iter_808` | 0.3129 | 0.4415 | 0.6430 | 0.5719 | 30.01M | 31.70G | 267.82 |
+| MRSFN | `cxup_4b_BW_PMRG_ML_grid_10x10_seed15859.yml` | `iter_1212` | 0.3443 | 0.4770 | 0.6766 | 0.6114 | 116.51M | 94.18G | 52.71 |
 
 The dataset was generated with
 `tools/build_city_split_dataset.py --grid-split --grid-seed 15859`. The remote
