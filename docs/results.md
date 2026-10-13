@@ -361,22 +361,72 @@ validation performance did not necessarily peak at the final iteration.
 | Model | Configuration | Best checkpoint | Best mIoU | Final checkpoint | Final mIoU | Final F1 | Final Accuracy | Final Kappa | Params | FLOPs | FPS |
 |---|---|---:|---:|---|---:|---:|---:|---:|---:|---:|---:|
 | U-Net | `unet_BW_city.yml` | `iter_11040` | 0.0787 | `iter_11500` | 0.0771 | 0.1157 | 0.2769 | 0.1912 | 13.48M | 36.02G | 121.08 |
+| DeepLab | `deeplabv3p_BW_city.yml` | `iter_3910` | 0.0707 | `iter_11500` | 0.0629 | 0.1005 | 0.2466 | 0.1502 | 26.83M | 29.11G | 220.93 |
+| OCRNet | `ocrnet_BW_city.yml` | `iter_5060` | 0.0434 | `iter_11500` | 0.0424 | 0.0708 | 0.2183 | 0.0874 | 12.19M | 14.41G | 139.62 |
+| SegFormer | `segformer_BW_city.yml` | `iter_4140` | 0.0613 | `iter_11500` | 0.0588 | 0.0955 | 0.2434 | 0.1490 | 27.73M | 15.73G | 178.93 |
+| HighDAN | `highdan_BW_city.yml` | `iter_460` | 0.0826 | `iter_11500` | 0.0659 | 0.1046 | 0.2782 | 0.1646 | 16.65M | 162.18G | 25.07 |
 | 1B / UpderNet | `cxup_1b_BW_city.yml` | `iter_4830` | 0.0682 | `iter_11500` | 0.0636 | 0.1031 | 0.2497 | 0.1528 | 30.01M | 31.70G | 95.00 |
+| CMX (MiT-B4) | `cmx_4b_BW_city.yml` | `iter_3220` | 0.1037 | `iter_11500` | 0.0925 | 0.1451 | 0.3036 | 0.2127 | 141.81M | 35.59G | 26.41 |
+| MRSN | `MRSN_BW_city.yml` | `iter_11270` | 0.1283 | `iter_11500` | 0.1271 | 0.1934 | 0.3957 | 0.3065 | 116.82M | 102.67G | 27.19 |
 | MRSFN | `cxup_4b_BW_PMRG_ML_city.yml` | `iter_460` | 0.1510 | `iter_11500` | 0.1293 | 0.1970 | 0.3890 | 0.3047 | 116.51M | 94.18G | 51.15 |
 
-The corresponding remote output directories are
-`output/exp01_city_unet_train_B_val_W`,
-`output/cxup_1b_BW_city_train_B_val_W`, and
-`output/cxup_4b_BW_PMRG_ML_city_train_B_val_W`. The best models are stored in
-each directory's `best_model/model.pdparams`.
+The corresponding remote output directories follow the pattern
+`output/<configuration>_train_B_val_W`; they include the original U-Net,
+1B, and MRSFN runs, the five added baseline runs, and
+`output/cmx_4b_BW_city_train_B_val_W`. The best models are stored in each
+directory's `best_model/model.pdparams`. MRSN was resumed from `iter_10810`
+after an intentional interruption and then completed at `iter_11500`; CMX was
+trained from scratch after MRSN finished.
 
 These results provide a geographic-independence check using a whole-city
 holdout. They should not be combined numerically with the ordinary BW table,
-because the validation distribution and split construction are different.
+because the validation distribution and split construction are different. The
+city-split ranking is MRSFN (0.1510), MRSN (0.1283), CMX (0.1037), HighDAN
+(0.0826), U-Net (0.0787), DeepLab (0.0707), 1B/UpderNet (0.0682), SegFormer
+(0.0613), and OCRNet (0.0434) by best validation mIoU.
 
-The separate 10x10 grid dataset generated with
-`--grid-split --grid-seed 15859` is not included here yet; it has been generated locally but has not
-been trained on the remote machine.
+### 8.3 10x10 grid split (EXP-11)
+
+To reduce the risk that adjacent patches appear in both training and
+validation sets, the full Beijing and Wuhan BW scenes were divided into 10x10
+spatial cells. With grid seed `15859`, the same ten cell indices
+`[2, 14, 28, 30, 49, 53, 66, 78, 81, 95]` were assigned to validation in each
+scene. Every patch was generated within a single cell, so no patch crosses a
+training/validation cell boundary. This is a spatial grid holdout within both
+cities, not a city-disjoint split.
+
+| Item | Setting |
+|---|---|
+| Raw data | Full Beijing and Wuhan BW scenes under `src/tif_BW` |
+| Grid construction | 10x10 cells per scene; 10 cells per scene for validation |
+| Grid seed | `15859` |
+| Training / validation patches | `3,240` / `360` (`2,160/240` for Beijing and `1,080/120` for Wuhan) |
+| Training batch / iterations | `16` / `20,200` (approximately 100 epochs) |
+| Model training seed | `1919810` |
+| Dataset root | `C2SEG_CITY_ROOT/C2SEG_BW_GRID_10X10_SEED15859` |
+
+The table reports the best validation mIoU and, separately, the metrics from
+the final `iter_20200` checkpoint. The three models were trained serially on
+the same grid split.
+
+| Model | Configuration | Best checkpoint | Best mIoU | Final checkpoint | Final mIoU | Final F1 | Final Accuracy | Final Kappa | Params | FLOPs | FPS |
+|---|---|---:|---:|---|---:|---:|---:|---:|---:|---:|---:|
+| U-Net | `unet_BW_grid_10x10_seed15859.yml` | `iter_3636` | 0.3391 | `iter_20200` | 0.3087 | 0.4333 | 0.6531 | 0.5785 | 13.48M | 36.02G | 353.81 |
+| 1B / UpderNet | `cxup_1b_BW_grid_10x10_seed15859.yml` | `iter_808` | 0.3129 | `iter_20200` | 0.2656 | 0.3757 | 0.6289 | 0.5472 | 30.01M | 31.70G | 267.82 |
+| MRSFN | `cxup_4b_BW_PMRG_ML_grid_10x10_seed15859.yml` | `iter_1212` | 0.3443 | `iter_20200` | 0.3090 | 0.4316 | 0.6606 | 0.5882 | 116.51M | 94.18G | 52.71 |
+
+The dataset was generated with
+`tools/build_city_split_dataset.py --grid-split --grid-seed 15859`. The remote
+training log is
+`/data/huilin/projects/MRSN/log/exp11_bw_grid_all_models/launcher.log`; the
+three output directories are `output/exp11_bw_grid_unet`,
+`output/exp11_bw_grid_1b`, and `output/exp11_bw_grid_mrsfn`.
+
+Because both training and validation cells are drawn from Beijing and Wuhan,
+this experiment evaluates spatial holdout performance within the observed
+cities. It should not be described as a city-level or cross-city OOD test, and
+its metrics should not be numerically combined with the ordinary BW table or
+the city-disjoint results above.
 
 ## 9. Model naming
 
