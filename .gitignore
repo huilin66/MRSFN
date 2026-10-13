@@ -19,6 +19,7 @@ pretrained/
 data/
 datasets/
 manuscript/
+benckmark/
 
 .venv/
 .vscode/

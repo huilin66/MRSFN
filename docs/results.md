@@ -448,13 +448,13 @@ Protocol:
   times; CUDA-synchronized; FPS reported as mean ± sample standard deviation.
 - Params: total parameter count including BatchNorm running statistics
   (same convention as `val.py`); trainable count excludes them.
-- FLOPs: `paddleslim.analysis.flops` with the two-stream inputs, the same
-  method as `val.py`, so the FLOPs column remains comparable with the
-  previously reported values. On non-Linux hosts the script falls back to
-  `paddle.flops` because importing paddleslim can hard-crash the
-  interpreter there; `--flops_backend` overrides the choice.
+- FLOPs: the two-stream input protocol used by `val.py`. The present run used
+  the `paddle.flops` fallback because the local Windows environment does not
+  use the Linux `paddleslim` backend; `--flops_backend` overrides the choice.
 - Pretrained weight loading is disabled during construction; weights do not
   affect Params, FLOPs, or FPS.
+- FPS timing covers model forward passes only. Data loading, host-to-device
+  transfer, post-processing, and metric calculation are excluded.
 
 Row-to-configuration mapping: `main_bw` and `main_ab` follow Section 2,
 `ablation_bw` follows Section 3, `backbone_bw` follows Section 4, and
@@ -470,7 +470,87 @@ bash scripts/exp12_efficiency_benchmark.sh              # all presets
 bash scripts/exp12_efficiency_benchmark.sh --preset main_bw   # one table
 ```
 
+Measurement record:
+
+- Paddle `3.3.1`; CUDA compiled: `True`; device: `gpu:0`.
+- GPU: NVIDIA GeForce RTX 4070 Ti.
+- FLOPs backend: `paddle.flops`.
+- Precision: FP32; batch size: 1; warmup: 20 iterations; timed: 100
+  iterations $×$ 3 repeats.
+- Date: `2026-10-13 19:51`.
+- All 44 preset rows completed successfully; duplicate configurations were
+  cached, corresponding to 27 unique configuration/subset pairs.
+
 Outputs: `benchmark/efficiency_benchmark.csv` (per-run FPS values) and
-`benchmark/efficiency_benchmark.md` (paper-style tables plus the environment
-block). The measured values are to be filled in after the server run.
+`benchmark/efficiency_benchmark.md` (the generated paper-style tables and
+environment block).
+
+### 10.1 Main BW efficiency results
+
+| Model | Configuration | Params (M) | FLOPs (G) | FPS (mean ± std) |
+|---|---|---:|---:|---:|
+| UNet | `unet_BW` | 13.48 | 36.02 | 256.39 ± 8.69 |
+| DeepLabV3+ | `deeplabv3p_BW` | 26.83 | 29.11 | 88.96 ± 8.67 |
+| OCRNet | `ocrnet_BW` | 12.19 | 14.41 | 21.59 ± 1.29 |
+| SegFormer | `segformer_BW` | 27.73 | 15.73 | 69.82 ± 9.18 |
+| HighDAN | `highdan_BW` | 16.65 | 162.18 | 25.74 ± 0.42 |
+| CMX (MiT-B4) | `cmx_4b_BW` | 141.81 | 35.59 | 14.39 ± 0.12 |
+| UPerNet (1B) | `cxup_1b_BW` | 30.01 | 31.70 | 160.94 ± 1.16 |
+| MRSN (4B2H) | `MRSN_BW` | 116.82 | 102.67 | 47.51 ± 0.06 |
+| MRSFN (full) | `cxup_4b_BW_PMRG_v2_lossV2` | 116.51 | 94.18 | 41.52 ± 4.21 |
+
+### 10.2 Main AB efficiency results
+
+| Model | Configuration | Params (M) | FLOPs (G) | FPS (mean ± std) |
+|---|---|---:|---:|---:|
+| UNet | `unet_AB` | 13.55 | 10.19 | 286.97 ± 3.09 |
+| DeepLabV3+ | `deeplabv3p_AB` | 26.86 | 7.43 | 90.38 ± 4.25 |
+| OCRNet | `ocrnet_AB` | 12.26 | 3.90 | 21.30 ± 0.37 |
+| SegFormer | `segformer_AB` | 28.13 | 4.34 | 70.11 ± 3.57 |
+| HighDAN | `highdan_AB` | 16.73 | 40.84 | 26.33 ± 0.40 |
+| CMX (MiT-B4) | `cmx_4b_AB` | 142.20 | 9.31 | 12.31 ± 0.68 |
+| UPerNet (1B) | `cxup_1b_AB` | 30.21 | 8.12 | 157.22 ± 17.03 |
+| MRSN (4B2H) | `MRSN_AB` | 117.02 | 25.87 | 40.25 ± 1.81 |
+| MRSFN (full) | `cxup_4b_AB_PMRG_v2_lossV2` | 116.70 | 23.75 | 40.94 ± 1.01 |
+
+### 10.3 Ablation efficiency results
+
+| Configuration | Model configuration | Params (M) | FLOPs (G) | FPS (mean ± std) |
+|---|---|---:|---:|---:|
+| 1-branch (UPerNet ref.) | `cxup_1b_BW` | 30.01 | 31.70 | 160.94 ± 1.16 |
+| 2-branch | `cxup_2b_BW` | 58.50 | 51.71 | 88.71 ± 5.94 |
+| 3-branch | `cxup_3b_BW` | 87.00 | 71.73 | 61.53 ± 2.59 |
+| 4-branchv0 | `cxup_4b_BW_RGB_NIR` | 115.49 | 91.74 | 49.11 ± 0.87 |
+| 4-branch | `cxup_4b_BW` | 115.49 | 91.76 | 48.46 ± 1.05 |
+| 4-branch + PMRG | `cxup_4b_BW_PMRG_city` | 116.51 | 94.18 | 45.06 ± 2.15 |
+| 4-branch + ML | `cxup_4b_BW` | 115.49 | 91.76 | 48.46 ± 1.05 |
+| MRSFN (4-branch + PMRG + ML) | `cxup_4b_BW_PMRG_v2_lossV2` | 116.51 | 94.18 | 41.52 ± 4.21 |
+
+### 10.4 Backbone/capacity efficiency results
+
+| Configuration | Backbone | Model configuration | Params (M) | FLOPs (G) | FPS (mean ± std) |
+|---|---|---|---:|---:|---:|
+| UPerNet (1 branch) | ConvNeXt-Tiny | `cxup_1b_BW` | 30.01 | 31.70 | 160.94 ± 1.16 |
+| 1 branch | ConvNeXt-Small | `cxup_1b_BW_small` | 51.65 | 53.80 | 100.98 ± 0.80 |
+| 2 branches | ConvNeXt-Tiny | `cxup_2b_BW` | 58.50 | 51.71 | 88.71 ± 5.94 |
+| 3 branches | ConvNeXt-Tiny | `cxup_3b_BW` | 87.00 | 71.73 | 61.53 ± 2.59 |
+| 1 branch | ConvNeXt-Base | `cxup_1b_BW_base` | 90.05 | 86.07 | 69.53 ± 0.37 |
+| 2 branches | ConvNeXt-Small | `cxup_2b_BW_small` | 101.77 | 95.91 | 48.58 ± 5.57 |
+| 4-branchv0 | ConvNeXt-Tiny | `cxup_4b_BW_RGB_NIR` | 115.49 | 91.74 | 49.11 ± 0.87 |
+| 4-branch | ConvNeXt-Tiny | `cxup_4b_BW` | 115.49 | 91.76 | 48.46 ± 1.05 |
+| 1 branch | ConvNeXt-Large | `cxup_1b_BW_large` | 199.28 | 177.61 | 39.55 ± 0.03 |
+
+### 10.5 Geographic-independent efficiency results
+
+| Model | Configuration | Params (M) | FLOPs (G) | FPS (mean ± std) |
+|---|---|---:|---:|---:|
+| UNet | `unet_BW_city` | 13.48 | 36.02 | 260.64 ± 0.94 |
+| DeepLabV3+ | `deeplabv3p_BW_city` | 26.83 | 29.11 | 88.92 ± 2.77 |
+| OCRNet | `ocrnet_BW_city` | 12.19 | 14.41 | 22.30 ± 0.29 |
+| SegFormer | `segformer_BW_city` | 27.73 | 15.73 | 75.62 ± 3.83 |
+| HighDAN | `highdan_BW_city` | 16.65 | 162.18 | 28.29 ± 0.87 |
+| CMX (MiT-B4) | `cmx_4b_BW_city` | 141.81 | 35.59 | 13.61 ± 0.74 |
+| UPerNet (1B) | `cxup_1b_BW_city` | 30.01 | 31.70 | 152.07 ± 3.64 |
+| MRSN | `MRSN_BW_city` | 116.82 | 102.67 | 42.86 ± 0.79 |
+| MRSFN | `cxup_4b_BW_PMRG_v2_lossV2_city` | 116.51 | 94.18 | 40.97 ± 3.42 |
 
