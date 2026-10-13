@@ -52,10 +52,10 @@ C2SEG_BW_ROOT=/path/to/C2Seg_BW/train
 
 ```yaml
 train_dataset:
-  dataset_root: ${C2SEG_BW_ROOT}
+  dataset_root: ${C2SEG_BW_ROOT}\train
   train_path: ${C2SEG_BW_ROOT}\train.txt
 val_dataset:
-  dataset_root: ${C2SEG_BW_ROOT}
+  dataset_root: ${C2SEG_BW_ROOT}\train
   val_path: ${C2SEG_BW_ROOT}\val.txt
 ```
 
