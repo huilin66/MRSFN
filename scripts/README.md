@@ -9,6 +9,7 @@ to the repository root before invoking its own training or evaluation command.
 - `exp03_repeatability.sh`: EXP-03, the 1B--4B branch-count chain and the 4B PMRG/loss ablations over three fixed seeds (21 runs).
 - `exp04_pmrg_evidence.sh`: EXP-04, direct gate visualization and branch-level missing/noisy-stream evaluation using the existing 4B BW checkpoints (inference only).
 - `exp06_msi_branch_control.sh`: EXP-06, the non-overlapping `RGB | NIR | SAR | HSI` four-branch control for the overlapping MSI split.
+- `exp12_efficiency_benchmark.sh`: EXP-12, unified Params/FLOPs/FPS benchmark for every paper row in one environment (no checkpoints or datasets required; results land in `benchmark/`).
 - `smoke_test_all.sh`: runs the smoke variant of EXP-01--04 and EXP-06; training commands override only `--iters 100`, while EXP-04 keeps its inference conditions. All smoke checkpoints, logs, evaluation outputs, and GPU-memory records are stored below the independent `smoke_test/` folder.
 
 The smoke artifact layout is:

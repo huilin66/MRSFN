@@ -18,6 +18,8 @@ tables.
   not selected independently.
 - Metrics: mIoU, F1, accuracy, and Kappa.
 - FPS is reported as logged and is dependent on hardware and runtime state.
+  A unified re-measurement protocol for Params/FLOPs/FPS is defined in
+  Section 10 and supersedes the logged FPS values for cross-model comparison.
 
 ## 2. Baseline comparison
 
@@ -424,4 +426,51 @@ the city-disjoint results above.
 - `UpderNet`: the 1B model, represented by `cxup_1b_BW` and `cxup_1b_AB`.
 - `MRSFN`: final proposed model (`4B + PMRG + ML`), represented by
   `cxup_4b_BW_PMRG_v2_lossV2` and `cxup_4b_AB_PMRG_v2_lossV2`.
+
+## 10. Unified efficiency benchmark
+
+The FPS values in Sections 2--4 and 8 were logged incidentally during full
+validation runs, once per experiment, on whatever hardware each experiment
+used, so they are not comparable across rows. The efficiency benchmark
+re-measures Params, FLOPs, and FPS for every paper row within one
+environment and one run.
+
+Protocol:
+
+- Tool: `PaddleCD/benchmark_efficiency.py` (launcher
+  `scripts/exp12_efficiency_benchmark.sh`); no checkpoints or datasets are
+  required, models are built from the `c2seg_config` files.
+- Inputs: synthetic random tensors of the exact validation shapes —
+  BW: `6 + 116` channels at `256 x 256`; AB: `6 + 242` channels at `128 x 128`.
+- Precision: FP32, `model.eval()`, `no_grad`, batch size `1` (matching the
+  validation inference protocol).
+- Timing: warmup `20` iterations, then `100` timed iterations, repeated `3`
+  times; CUDA-synchronized; FPS reported as mean ± sample standard deviation.
+- Params: total parameter count including BatchNorm running statistics
+  (same convention as `val.py`); trainable count excludes them.
+- FLOPs: `paddleslim.analysis.flops` with the two-stream inputs, the same
+  method as `val.py`, so the FLOPs column remains comparable with the
+  previously reported values. On non-Linux hosts the script falls back to
+  `paddle.flops` because importing paddleslim can hard-crash the
+  interpreter there; `--flops_backend` overrides the choice.
+- Pretrained weight loading is disabled during construction; weights do not
+  affect Params, FLOPs, or FPS.
+
+Row-to-configuration mapping: `main_bw` and `main_ab` follow Section 2,
+`ablation_bw` follows Section 3, `backbone_bw` follows Section 4, and
+`city_bw` follows Section 8 (the `4B + PMRG` and `4B + ML` rows reuse the
+`CX_Uper_4B_PMRG_V2` and plain `4B` architectures respectively, because ML
+changes only the training loss and `cxup_4b_BW_PMRG_v2.yml` /
+`cxup_4b_BW_lossV2.yml` are not in this repository).
+
+Run:
+
+```bash
+bash scripts/exp12_efficiency_benchmark.sh              # all presets
+bash scripts/exp12_efficiency_benchmark.sh --preset main_bw   # one table
+```
+
+Outputs: `benchmark/efficiency_benchmark.csv` (per-run FPS values) and
+`benchmark/efficiency_benchmark.md` (paper-style tables plus the environment
+block). The measured values are to be filled in after the server run.
 
