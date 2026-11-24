@@ -37,14 +37,17 @@ class DiceLoss(nn.Layer):
 
     def forward(self, logits, labels):
         labels = paddle.cast(labels, dtype='int32')
-        labels_one_hot = F.one_hot(labels, num_classes=logits.shape[1])
+        valid = (labels != self.ignore_index)
+        # one_hot rejects ignore_index (e.g. 255); use a safe placeholder first
+        # and mask the ignored pixels out below.
+        safe_labels = paddle.where(valid, labels, paddle.zeros_like(labels))
+        labels_one_hot = F.one_hot(safe_labels, num_classes=logits.shape[1])
         labels_one_hot = paddle.transpose(labels_one_hot, [0, 3, 1, 2])
         labels_one_hot = paddle.cast(labels_one_hot, dtype='float32')
 
         logits = F.softmax(logits, axis=1)
 
-        mask = (paddle.unsqueeze(labels, 1) != self.ignore_index)
-        mask = mask.astype('float32')
+        mask = paddle.unsqueeze(valid, 1).astype('float32')
         logits = logits * mask
         labels_one_hot = labels_one_hot * mask
 
@@ -95,7 +98,14 @@ class HardDiceLoss(nn.Layer):
     def forward(self, logits, labels):
         # 1. 预处理 labels 为 one-hot 格式
         labels = paddle.cast(labels, dtype='int32')
-        labels_one_hot = F.one_hot(labels, num_classes=logits.shape[1])
+        if self.ignore_index is not None:
+            valid = (labels != self.ignore_index)
+            # one_hot rejects ignore_index; use a placeholder and mask later.
+            safe_labels = paddle.where(valid, labels, paddle.zeros_like(labels))
+        else:
+            valid = None
+            safe_labels = labels
+        labels_one_hot = F.one_hot(safe_labels, num_classes=logits.shape[1])
         labels_one_hot = paddle.transpose(labels_one_hot, [0, 3, 1, 2])
         labels_one_hot = paddle.cast(labels_one_hot, dtype='float32')
 
@@ -104,9 +114,8 @@ class HardDiceLoss(nn.Layer):
             logits = F.softmax(logits, axis=1)
 
         # 3. 处理 ignore_index mask
-        if self.ignore_index is not None:
-            mask = (paddle.unsqueeze(labels, 1) != self.ignore_index)
-            mask = mask.astype('float32')
+        if valid is not None:
+            mask = paddle.unsqueeze(valid, 1).astype('float32')
             logits = logits * mask
             labels_one_hot = labels_one_hot * mask
         else:

@@ -30,6 +30,7 @@ class CrossEntropyLoss_Smooth(nn.Layer):
         super(CrossEntropyLoss_Smooth, self).__init__()
 
         self.smoothing = smoothing
+        self.ignore_index = ignore_index
 
     def forward(self, inputs, targets):
         assert len(inputs.shape) == 4
@@ -37,12 +38,21 @@ class CrossEntropyLoss_Smooth(nn.Layer):
         targets = targets.flatten(1)
 
         c = inputs.shape[-1]
-        targets = F.one_hot(targets, c)
+        valid = (targets != self.ignore_index)
+        # one_hot rejects ignore_index (e.g. 255); use a safe placeholder first
+        # and mask the ignored pixels out of the normalisation below.
+        safe_targets = paddle.where(valid, targets, paddle.zeros_like(targets))
+        targets = F.one_hot(safe_targets, c)
         targets = paddle.cast(targets, 'float32')
         targets = (1 - self.smoothing) * targets + self.smoothing / c
         inputs = F.log_softmax(inputs, axis=-1)
 
-        return paddle.mean(- inputs * targets)
+        # Keep the original loss scale (mean over N * H * W * C) while
+        # excluding ignored pixels from both numerator and denominator.
+        per_pixel = -paddle.sum(inputs * targets, axis=-1)
+        valid = paddle.cast(valid, 'float32')
+        return paddle.sum(per_pixel * valid) / (
+            c * paddle.sum(valid) + 1e-8)
 
 @manager.LOSSES.add_component
 class CrossEntropyLoss(nn.Layer):
@@ -112,7 +122,9 @@ class CrossEntropyLoss(nn.Layer):
             loss = loss * semantic_weights
 
         if self.weight is not None:
-            _one_hot = F.one_hot(label, logit.shape[-1])
+            safe_label = paddle.where(label != self.ignore_index, label,
+                                      paddle.zeros_like(label))
+            _one_hot = F.one_hot(safe_label, logit.shape[-1])
             coef = paddle.sum(_one_hot * self.weight, axis=-1)
         else:
             coef = paddle.ones_like(label)
