@@ -55,6 +55,14 @@ Subcommands
     ignores spatial adjacency; use the grid/strip scheme when a geographically
     disjoint split is required.
 
+``stats``
+    Compute ``Normalize2`` statistics the same way as the C2Seg
+    ``tools/data_sta.py``: for every patch take the per-channel mean/std, then
+    average those per-patch values across patches (``Col_avg``).  Pass both
+    ``train.txt`` and ``val.txt`` to use the same patch scope as C2Seg's
+    ``train/`` folder.  ``--update-config MDAS.yml`` replaces the four lists in
+    both the train and val dataset blocks.
+
 Examples
 --------
     python tools/mdas_tool.py info \
@@ -74,18 +82,25 @@ Examples
 
     python tools/mdas_tool.py split \
         --patches data/MDAS_64/patches.txt --val-ratio 0.1 --seed 0
+
+    python tools/mdas_tool.py stats \
+        --lists Z:/huilin/backup/data_backup/Augsburg_data_4_publication/mdas_clip/train.txt \
+                Z:/huilin/backup/data_backup/Augsburg_data_4_publication/mdas_clip/val.txt \
+        --mask none --update-config PaddleCD/c2seg_config/MDAS.yml
 """
 
 from __future__ import annotations
 
 import argparse
 import json
+import re
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
 import numpy as np
 import tifffile
+import yaml
 
 REF_REL = Path("entire_city") / "EeteS_EnMAP_10m.tif"
 LANDUSE_REL = Path("entire_city") / "OSM_label" / "osm_landuse.tif"
@@ -887,6 +902,155 @@ def cmd_split(args: argparse.Namespace) -> int:
     return 0
 
 
+def _fmt_stat_list(values: np.ndarray) -> str:
+    return "[" + ", ".join(f"{float(v):.3f}" for v in values) + "]"
+
+
+def _replace_yaml_list(text: str, key: str, values: np.ndarray) -> tuple[str, int]:
+    pattern = rf"^(\s*{re.escape(key)}:\s*)\[.*\]\s*$"
+    return re.subn(
+        pattern,
+        rf"\g<1>{_fmt_stat_list(values)}",
+        text,
+        flags=re.M,
+    )
+
+
+def cmd_stats(args: argparse.Namespace) -> int:
+    list_paths = [Path(p) for p in args.lists]
+    for path in list_paths:
+        if not path.exists():
+            raise FileNotFoundError(path)
+
+    roots = {path.parent for path in list_paths}
+    if len(roots) != 1:
+        raise ValueError("all --lists files must live in the same directory")
+    patch_root = next(iter(roots))
+
+    lines: list[str] = []
+    seen: set[str] = set()
+    for path in list_paths:
+        for line in _read_patch_list(path):
+            if line not in seen:
+                seen.add(line)
+                lines.append(line)
+    if not lines:
+        raise ValueError("no patches found in --lists")
+
+    ms_means: list[np.ndarray] = []
+    ms_stds: list[np.ndarray] = []
+    hsi_means: list[np.ndarray] = []
+    hsi_stds: list[np.ndarray] = []
+    for index, line in enumerate(lines):
+        parts = line.split()
+        ms = tifffile.imread(
+            patch_root / parts[0].replace("msi", "msisar")
+        ).astype(np.float64)
+        hsi = tifffile.imread(
+            patch_root / parts[1].replace("sar", "hsi")
+        ).astype(np.float64)
+
+        if args.mask == "ignore":
+            label = tifffile.imread(patch_root / parts[2])
+            valid = label != IGNORE_INDEX
+            if not valid.any():
+                continue
+            ms = ms[valid]
+            hsi = hsi[valid]
+        else:
+            ms = ms.reshape(-1, ms.shape[-1])
+            hsi = hsi.reshape(-1, hsi.shape[-1])
+
+        ms_means.append(ms.mean(axis=0))
+        ms_stds.append(ms.std(axis=0))
+        hsi_means.append(hsi.mean(axis=0))
+        hsi_stds.append(hsi.std(axis=0))
+        if (index + 1) % 50 == 0:
+            print(f"  stats {index + 1}/{len(lines)}")
+
+    if not ms_means:
+        raise ValueError("no usable pixels after masking")
+
+    # C2Seg data_sta.py: per-patch mean/std first, then Col_avg across patches.
+    mean1 = np.mean(np.stack(ms_means, axis=0), axis=0)
+    std1 = np.mean(np.stack(ms_stds, axis=0), axis=0)
+    mean2 = np.mean(np.stack(hsi_means, axis=0), axis=0)
+    std2 = np.mean(np.stack(hsi_stds, axis=0), axis=0)
+
+    print(
+        f"C2Seg-style Col_avg over {len(ms_means)} patches "
+        f"(mask={args.mask})"
+    )
+    print("mean1", _fmt_stat_list(mean1))
+    print("std1 ", _fmt_stat_list(std1))
+    print("mean2[:5] / [-5:]",
+          _fmt_stat_list(mean2[:5]), _fmt_stat_list(mean2[-5:]))
+    print("std2[:5]  / [-5:]",
+          _fmt_stat_list(std2[:5]), _fmt_stat_list(std2[-5:]))
+    if np.any(std1 == 0) or np.any(std2 == 0):
+        raise ValueError("computed a zero standard deviation; check the data")
+    if len(mean1) != 6 or len(mean2) not in (116, 242):
+        print(
+            f"warning: unusual channel counts mean1={len(mean1)} "
+            f"mean2={len(mean2)}"
+        )
+
+    stats_json = (
+        Path(args.stats_json)
+        if args.stats_json
+        else patch_root / "normalize_stats_c2seg.json"
+    )
+    meta = {
+        "tool": "tools/mdas_tool.py stats",
+        "created_utc": datetime.now(timezone.utc).isoformat(),
+        "method": (
+            "C2Seg data_sta.py Col_avg: per-patch per-channel mean/std, "
+            "then averaged across patches"
+        ),
+        "mask": args.mask,
+        "list_files": [str(path) for path in list_paths],
+        "num_patches": len(ms_means),
+        "mean1": mean1.tolist(),
+        "std1": std1.tolist(),
+        "mean2": mean2.tolist(),
+        "std2": std2.tolist(),
+    }
+    stats_json.parent.mkdir(parents=True, exist_ok=True)
+    with stats_json.open("w", encoding="utf-8") as fh:
+        json.dump(meta, fh, indent=2, ensure_ascii=False)
+        fh.write("\n")
+    print(f"written: {stats_json}")
+
+    if args.update_config:
+        config_path = Path(args.update_config)
+        text = config_path.read_text(encoding="utf-8")
+        for key, values in (
+            ("mean1", mean1),
+            ("std1", std1),
+            ("mean2", mean2),
+            ("std2", std2),
+        ):
+            text, count = _replace_yaml_list(text, key, values)
+            print(f"  {key}: replaced {count} occurrence(s)")
+            if count == 0:
+                raise ValueError(f"{config_path} has no {key} entry")
+        config_path.write_text(text, encoding="utf-8")
+
+        parsed = yaml.safe_load(text)
+        for part in ("train_dataset", "val_dataset"):
+            transform = parsed[part]["transforms"][0]
+            if (
+                len(transform["mean1"]) != len(mean1)
+                or len(transform["std1"]) != len(std1)
+                or len(transform["mean2"]) != len(mean2)
+                or len(transform["std2"]) != len(std2)
+            ):
+                raise ValueError(f"{part} statistics have unexpected lengths")
+        print(f"updated: {config_path}")
+
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description=__doc__,
@@ -1040,6 +1204,38 @@ def build_parser() -> argparse.ArgumentParser:
     split.add_argument("--overwrite", action="store_true", help="overwrite existing files")
     split.add_argument("--dry-run", action="store_true", help="print the split without writing")
     split.set_defaults(func=cmd_split)
+
+    stats = sub.add_parser(
+        "stats",
+        help="compute C2Seg-style Normalize2 mean/std for MDAS patches",
+    )
+    stats.add_argument(
+        "--lists",
+        nargs="+",
+        required=True,
+        type=Path,
+        help="patch list files to use, e.g. train.txt val.txt",
+    )
+    stats.add_argument(
+        "--mask",
+        choices=("none", "ignore"),
+        default="none",
+        help="none = all pixels (C2Seg data_sta.py default); "
+        "ignore = drop label 255 pixels",
+    )
+    stats.add_argument(
+        "--stats-json",
+        type=Path,
+        default=None,
+        help="output JSON (default: <patch dir>/normalize_stats_c2seg.json)",
+    )
+    stats.add_argument(
+        "--update-config",
+        type=Path,
+        default=None,
+        help="replace mean1/std1/mean2/std2 in this YAML config",
+    )
+    stats.set_defaults(func=cmd_stats)
     return parser
 
 
