@@ -1,4 +1,4 @@
-_base_: 'C2Seg_MDAS.yml'
+_base_: 'MDAS.yml'
 
 # MRSFN (full), equivalent to cxup_4b_AB_PMRG_ML on the AB dataset.
 model:

@@ -1,4 +1,4 @@
-_base_: 'C2Seg_MDAS.yml'
+_base_: 'MDAS.yml'
 
 # "UPerNet" baseline in this repository is the 1B CX_Uper (UpderNet) model.
 model:

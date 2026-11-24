@@ -1,4 +1,4 @@
-_base_: 'C2Seg_MDAS.yml'
+_base_: 'MDAS.yml'
 
 # MRSN (4B2H)
 model:
