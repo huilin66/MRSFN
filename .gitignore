@@ -18,6 +18,8 @@ checkpoints/
 pretrained/
 data/
 datasets/
+!PaddleCD/paddleseg/datasets/
+!PaddleCD/paddleseg/datasets/h2sr.py
 manuscript/
 
 .venv/

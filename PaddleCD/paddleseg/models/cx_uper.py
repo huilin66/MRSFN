@@ -14,10 +14,11 @@ FOUR_B_STREAM_NAMES = ('NIRGB', 'RGB', 'SAR', 'HSI')
 def split_4b_streams(t1, t2):
     """Split the two dataset inputs into the four logical 4B streams.
 
-    ``t1`` contains six normalized MSI/SAR channels in the order
-    ``[MSI_0, MSI_1, MSI_2, MSI_3, SAR_0, SAR_1]`` and ``t2`` contains HSI.
-    NIRGB and RGB intentionally share the first two MSI channels, matching the
-    existing model implementation.
+    ``t1`` contains four MSI channels followed by ``sar_chs`` SAR-slot
+    channels, ``[MSI_0, MSI_1, MSI_2, MSI_3, SAR_0, ...]``; ``t2`` contains
+    HSI.  NIRGB and RGB intentionally share the first MSI channels, matching
+    the existing model implementation.  ``sar_chs`` may be larger than two
+    (e.g. the six remaining Sentinel-2 bands used as a SAR proxy).
     """
     nirgb = paddle.concat([t1[:, :2, ...], t1[:, 3:4, ...]], axis=1)
     rgb = t1[:, :3, ...]
@@ -80,25 +81,26 @@ class CX_Uper(nn.Layer):
                  num_classes,
                  backb,
                  hsi_chs=242,
+                 msi_chs=6,
                  dropout_rate=0.0,
                  pretrained=True,
                  ):
         super(CX_Uper, self).__init__()
         if backb == 'convnext_tiny':
             self.backbone = convnext.convnext_tiny(
-                pretrained=pretrained, in_chans=hsi_chs + 6)
+                pretrained=pretrained, in_chans=hsi_chs + msi_chs)
         elif backb == 'convnext_small':
             self.backbone = convnext.convnext_small(
-                pretrained=pretrained, in_chans=hsi_chs + 6)
+                pretrained=pretrained, in_chans=hsi_chs + msi_chs)
         elif backb == 'convnext_base':
             self.backbone = convnext.convnext_base(
-                pretrained=pretrained, in_chans=hsi_chs + 6)
+                pretrained=pretrained, in_chans=hsi_chs + msi_chs)
         elif backb == 'convnext_large':
             self.backbone = convnext.convnext_large(
-                pretrained=pretrained, in_chans=hsi_chs + 6)
+                pretrained=pretrained, in_chans=hsi_chs + msi_chs)
         else:
             self.backbone = convnext.convnext_base(
-                pretrained=pretrained, in_chans=hsi_chs + 6)
+                pretrained=pretrained, in_chans=hsi_chs + msi_chs)
 
         self.decode_head = UPerHead(self.backbone.dims[:3], num_classes=num_classes)
         self.drop = nn.Dropout2D(dropout_rate)
@@ -196,23 +198,24 @@ class CX_Uper_4B(nn.Layer):
                     num_classes, 
                     backb, 
                     hsi_chs=242, 
+                    sar_chs=2,
                     dropout_rate=0.0,
                     ):
         super(CX_Uper_4B, self).__init__()
         if backb == 'convnext_tiny':
             self.backbone0 = convnext.convnext_tiny()
             self.backbone1 = convnext.convnext_tiny()
-            self.backbone2 = convnext.convnext_tiny(in_chans=2)
+            self.backbone2 = convnext.convnext_tiny(in_chans=sar_chs)
             self.backbone3 = convnext.convnext_tiny(in_chans=hsi_chs)
         elif backb == 'convnext_small':
             self.backbone0 = convnext.convnext_small()
             self.backbone1 = convnext.convnext_small()
-            self.backbone2 = convnext.convnext_small(in_chans=2)
+            self.backbone2 = convnext.convnext_small(in_chans=sar_chs)
             self.backbone3 = convnext.convnext_small(in_chans=hsi_chs)
         else:
             self.backbone0 = convnext.convnext_base()
             self.backbone1 = convnext.convnext_base()
-            self.backbone2 = convnext.convnext_base(in_chans=2)
+            self.backbone2 = convnext.convnext_base(in_chans=sar_chs)
             self.backbone3 = convnext.convnext_base(in_chans=hsi_chs)
         
         self.decode_head4b = UPerHead_4B(self.backbone1.dims[:3], num_classes=num_classes)
@@ -789,23 +792,24 @@ class CX_Uper_4B2H(nn.Layer):
                     num_classes, 
                     backb, 
                     hsi_chs=242, 
+                    sar_chs=2,
                     dropout_rate=0.0,
                     ):
         super(CX_Uper_4B2H, self).__init__()
         if backb == 'convnext_tiny':
             self.backbone0 = convnext.convnext_tiny()
             self.backbone1 = convnext.convnext_tiny()
-            self.backbone2 = convnext.convnext_tiny(in_chans=2)
+            self.backbone2 = convnext.convnext_tiny(in_chans=sar_chs)
             self.backbone3 = convnext.convnext_tiny(in_chans=hsi_chs)
         elif backb == 'convnext_small':
             self.backbone0 = convnext.convnext_small()
             self.backbone1 = convnext.convnext_small()
-            self.backbone2 = convnext.convnext_small(in_chans=2)
+            self.backbone2 = convnext.convnext_small(in_chans=sar_chs)
             self.backbone3 = convnext.convnext_small(in_chans=hsi_chs)
         else:
             self.backbone0 = convnext.convnext_base()
             self.backbone1 = convnext.convnext_base()
-            self.backbone2 = convnext.convnext_base(in_chans=2)
+            self.backbone2 = convnext.convnext_base(in_chans=sar_chs)
             self.backbone3 = convnext.convnext_base(in_chans=hsi_chs)
         
 

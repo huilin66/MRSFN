@@ -1,0 +1,13 @@
+_base_: 'H2SR.yml'
+
+# t1 = [B4, B3, B2, B8, B5, B6, B7, B8a, B11, B12]:
+#   msi_chs=4 -> RGB + NIR (B4/B3/B2/B8)
+#   sar_chs=6 -> the remaining Sentinel-2 bands occupy the SAR slots.
+# There is no true SAR in WHU-H2SR-MT; these are MSI bands used as a proxy.
+model:
+  type: HighDAN
+  in_channels: 259
+  num_classes: 8
+  hsi_chs: 249
+  msi_chs: 4
+  sar_chs: 6

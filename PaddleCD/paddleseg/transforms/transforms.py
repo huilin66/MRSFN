@@ -102,8 +102,9 @@ class Normalize2:
             raise ValueError(
                 "{}: input type is invalid. It should be list or tuple".format(
                     self))
-        from functools import reduce
-        if reduce(lambda x, y: x * y, self.std1) == 0 or reduce(lambda x, y: x * y, self.std2) == 0:
+        # Do not use a product here: for 249-band HSI the product of small
+        # standard deviations underflows to 0.0 and falsely rejects valid std.
+        if np.any(np.asarray(self.std1) == 0) or np.any(np.asarray(self.std2) == 0):
             raise ValueError('{}: std is invalid!'.format(self))
         
         self.mean1 = np.array(self.mean1)[np.newaxis, np.newaxis, :]
@@ -151,8 +152,9 @@ class Normalize2B:
             raise ValueError(
                 "{}: input type is invalid. It should be list or tuple".format(
                     self))
-        from functools import reduce
-        if reduce(lambda x, y: x * y, self.std1) == 0 or reduce(lambda x, y: x * y, self.std2) == 0:
+        # Do not use a product here: for 249-band HSI the product of small
+        # standard deviations underflows to 0.0 and falsely rejects valid std.
+        if np.any(np.asarray(self.std1) == 0) or np.any(np.asarray(self.std2) == 0):
             raise ValueError('{}: std is invalid!'.format(self))
         
         self.mean1 = np.array(self.mean1)[np.newaxis, np.newaxis, :]

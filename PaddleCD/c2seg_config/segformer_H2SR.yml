@@ -1,0 +1,10 @@
+_base_: 'H2SR.yml'
+
+model:
+  type: SegFormer
+  backbone:
+    type: MixVisionTransformer_B2
+    in_channels: 259
+    pretrained: https://bj.bcebos.com/paddleseg/dygraph/backbone/mix_vision_transformer_b2.tar.gz
+  embedding_dim: 768
+  num_classes: 8

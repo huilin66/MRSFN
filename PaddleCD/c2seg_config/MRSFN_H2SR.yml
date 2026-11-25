@@ -1,0 +1,22 @@
+_base_: 'H2SR.yml'
+
+# t1 = [B4,B3,B2,B8,B5,B6,B7,B8a,B11,B12]: 4 MSI + 6 SAR-slot channels.
+
+# MRSFN (full), equivalent to cxup_4b_AB_PMRG_ML on the AB dataset.
+model:
+  type: CX_Uper_4B_PMRG_V2
+  backb: convnext_tiny
+  in_channels: 3
+  num_classes: 8
+  dropout_rate: 0
+  hsi_chs: 249
+  sar_chs: 6
+
+loss:
+  types:
+    - type: MixedLoss
+      losses:
+        - type: Poly1Loss_Smooth
+        - type: DiceLoss
+      coef: [1, 0.5]
+  coef: [1]

@@ -21,6 +21,7 @@ Output layout::
 
     <out>/hsi/<id>.tif        [128, 128, 249] float32
     <out>/mt/<id>.tif         [128, 128, 310] float32 (default)
+    <out>/msi/<id>.tif        [128, 128, 10]  float32 (build-msi)
     <out>/lbl/<id>.tif        [128, 128]       uint8, 255 = ignore
     <out>/mt_lbl/<id>.tif     [128, 128]       uint8, 255 = ignore
     <out>/patches.txt         hsi/<id>.tif mt/<id>.tif lbl/<id>.tif mt_lbl/<id>.tif
@@ -35,6 +36,15 @@ Subcommands
     Resize every sample to 128 x 128 and write the TIFF data set.  ``--dry-run``
     prints the sample count and estimated output size.  ``--limit`` and
     ``--skip-existing`` are useful for smoke tests and resuming.
+
+``build-msi``
+    Build the 10-channel MSI composite used by the static baselines: temporal
+    median (or mean) of the 31 dates, then bands
+    B4/B3/B2/B8/B5/B6/B7/B8a/B11/B12.  The first four channels are RGB+NIR;
+    the remaining six occupy the SAR slots of the 4B models.  The release's
+    ``-FLT_MAX`` fill values are ignored.  Output::
+
+        <out>/msi/<id>.tif     [128, 128, 10] float32
 
 ``verify``
     Check the output list, file existence, shapes and dtypes.
@@ -550,6 +560,75 @@ def cmd_build(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_build_msi(args: argparse.Namespace) -> int:
+    patches = Path(args.patches)
+    lines = _read_patch_list(patches)
+    root = patches.parent
+    out = Path(args.out) if args.out else root
+    msi_dir = out / "msi"
+    bands = list(args.bands)
+    if len(bands) != 10 or any(b < 0 or b >= MT_BANDS for b in bands):
+        raise ValueError("--bands must contain ten valid indices into the 10 MT bands")
+    band_names = ["B2", "B3", "B4", "B5", "B6", "B7", "B8", "B8a", "B11", "B12"]
+    if args.dry_run:
+        print(f"samples: {len(lines)}")
+        print(f"reduce : temporal {args.reduce} over {MT_DATES} dates")
+        print(f"bands  : {bands} -> {[band_names[b] for b in bands]}")
+        print(f"out    : {msi_dir}")
+        return 0
+    msi_dir.mkdir(parents=True, exist_ok=True)
+    written = 0
+    t0 = time.time()
+    for index, line in enumerate(lines, 1):
+        parts = line.split()
+        mt_path = root / parts[1]
+        stem = Path(parts[0]).stem
+        dst = msi_dir / f"{stem}.tif"
+        if dst.exists() and not args.overwrite:
+            written += 1
+            continue
+        mt = tifffile.imread(mt_path)
+        if mt.shape != (OUT_SIZE, OUT_SIZE, MT_CHANNELS):
+            raise ValueError(f"{mt_path}: expected {(OUT_SIZE, OUT_SIZE, MT_CHANNELS)}, got {mt.shape}")
+        mt = mt.reshape(OUT_SIZE, OUT_SIZE, MT_DATES, MT_BANDS)
+        # The release uses -FLT_MAX for missing dates/pixels; ignore those
+        # values instead of letting them dominate the temporal composite.
+        mt = np.where(mt < -1e30, np.nan, mt)
+        if args.reduce == "median":
+            composite = np.nanmedian(mt, axis=2)
+        else:
+            composite = np.nanmean(mt, axis=2)
+        composite = np.nan_to_num(composite, nan=0.0)
+        msi = np.ascontiguousarray(composite[..., bands], dtype=np.float32)
+        _write_tiff(dst, msi, args.compression, args.compression_level)
+        written += 1
+        if index % 100 == 0 or index == len(lines):
+            print(f"  {index}/{len(lines)} written={written} ({time.time()-t0:.0f}s)")
+    meta = {
+        "tool": "tools/h2sr_tools.py build-msi",
+        "created_utc": datetime.now(timezone.utc).isoformat(),
+        "patches": str(patches),
+        "out": str(msi_dir),
+        "source_mt_channels": MT_CHANNELS,
+        "source_mt_dates": MT_DATES,
+        "source_mt_bands": MT_BANDS,
+        "reduce": f"temporal {args.reduce} over {MT_DATES} dates",
+        "band_indices": bands,
+        "band_names": [band_names[b] for b in bands],
+        "output_shape": [OUT_SIZE, OUT_SIZE, len(bands)],
+        "note": (
+            "The first four channels are [B4,B3,B2,B8] (RGB+NIR); the "
+            "remaining six [B5,B6,B7,B8a,B11,B12] occupy the SAR slots of "
+            "the 4B/HighDAN models. They are Sentinel-2 MSI bands, not SAR."
+        ),
+    }
+    (out / "msi_metadata.json").write_text(
+        json.dumps(meta, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    print(f"written {written} MSI composites to {msi_dir}")
+    print(f"metadata -> {out / 'msi_metadata.json'}")
+    return 0
+
+
 def _read_patch_list(path: Path) -> list[str]:
     lines = [line.strip() for line in Path(path).read_text(encoding="utf-8").splitlines()]
     lines = [line for line in lines if line]
@@ -808,29 +887,49 @@ def cmd_stats(args: argparse.Namespace) -> int:
     hsi_stds: list[np.ndarray] = []
     mt_means: list[np.ndarray] = []
     mt_stds: list[np.ndarray] = []
+    msi_means: list[np.ndarray] = []
+    msi_stds: list[np.ndarray] = []
     t0 = time.time()
     for index, line in enumerate(lines, 1):
         parts = line.split()
         hsi = tifffile.imread(root / parts[0]).astype(np.float64)
-        mt = tifffile.imread(root / parts[1]).astype(np.float64)
-        if mt.ndim == 4:  # optional dates-first layout: [31, 10, H, W]
-            mt = mt.transpose(2, 3, 0, 1).reshape(mt.shape[2], mt.shape[3], MT_CHANNELS)
-        if args.mask == "ignore":
-            label = tifffile.imread(root / parts[2])
-            mt_label = tifffile.imread(root / parts[3])
-            valid = label != IGNORE_INDEX
-            valid_mt = mt_label != IGNORE_INDEX
-            if not valid.any() or not valid_mt.any():
-                continue
-            hsi = hsi[valid]
-            mt = mt[valid_mt]
+        if args.msi:
+            stem = Path(parts[0]).stem
+            msi = tifffile.imread(root / "msi" / f"{stem}.tif").astype(np.float64)
+            if args.mask == "ignore":
+                label = tifffile.imread(root / parts[2])
+                valid = label != IGNORE_INDEX
+                if not valid.any():
+                    continue
+                hsi = hsi[valid]
+                msi = msi[valid]
+            else:
+                hsi = hsi.reshape(-1, hsi.shape[-1])
+                msi = msi.reshape(-1, msi.shape[-1])
+            hsi_means.append(hsi.mean(axis=0))
+            hsi_stds.append(hsi.std(axis=0))
+            msi_means.append(msi.mean(axis=0))
+            msi_stds.append(msi.std(axis=0))
         else:
-            hsi = hsi.reshape(-1, hsi.shape[-1])
-            mt = mt.reshape(-1, mt.shape[-1])
-        hsi_means.append(hsi.mean(axis=0))
-        hsi_stds.append(hsi.std(axis=0))
-        mt_means.append(mt.mean(axis=0))
-        mt_stds.append(mt.std(axis=0))
+            mt = tifffile.imread(root / parts[1]).astype(np.float64)
+            if mt.ndim == 4:  # optional dates-first layout: [31, 10, H, W]
+                mt = mt.transpose(2, 3, 0, 1).reshape(mt.shape[2], mt.shape[3], MT_CHANNELS)
+            if args.mask == "ignore":
+                label = tifffile.imread(root / parts[2])
+                mt_label = tifffile.imread(root / parts[3])
+                valid = label != IGNORE_INDEX
+                valid_mt = mt_label != IGNORE_INDEX
+                if not valid.any() or not valid_mt.any():
+                    continue
+                hsi = hsi[valid]
+                mt = mt[valid_mt]
+            else:
+                hsi = hsi.reshape(-1, hsi.shape[-1])
+                mt = mt.reshape(-1, mt.shape[-1])
+            hsi_means.append(hsi.mean(axis=0))
+            hsi_stds.append(hsi.std(axis=0))
+            mt_means.append(mt.mean(axis=0))
+            mt_stds.append(mt.std(axis=0))
         if index % 50 == 0:
             print(f"  stats {index}/{len(lines)} ({time.time()-t0:.0f}s)")
 
@@ -838,9 +937,6 @@ def cmd_stats(args: argparse.Namespace) -> int:
         raise ValueError("no usable pixels after masking")
     mean_hsi = np.mean(np.stack(hsi_means), axis=0)
     std_hsi = np.mean(np.stack(hsi_stds), axis=0)
-    mean_mt = np.mean(np.stack(mt_means), axis=0)
-    std_mt = np.mean(np.stack(mt_stds), axis=0)
-
     meta = {
         "tool": "tools/h2sr_tools.py stats",
         "created_utc": datetime.now(timezone.utc).isoformat(),
@@ -849,25 +945,47 @@ def cmd_stats(args: argparse.Namespace) -> int:
         "list_files": [str(p) for p in list_paths],
         "num_patches": len(hsi_means),
         "hsi_bands": HSI_BANDS,
-        "mt_dates": MT_DATES,
-        "mt_bands": MT_BANDS,
         "mean_hsi": mean_hsi.tolist(),
         "std_hsi": std_hsi.tolist(),
-        "mean_mt": mean_mt.tolist(),
-        "std_mt": std_mt.tolist(),
-        "mean_mt_by_date_band": mean_mt.reshape(MT_DATES, MT_BANDS).tolist(),
-        "std_mt_by_date_band": std_mt.reshape(MT_DATES, MT_BANDS).tolist(),
     }
-    stats_path = Path(args.stats_json) if args.stats_json else root / "normalize_stats.json"
+    if args.msi:
+        mean_msi = np.mean(np.stack(msi_means), axis=0)
+        std_msi = np.mean(np.stack(msi_stds), axis=0)
+        meta.update({
+            "msi_bands": int(len(mean_msi)),
+            "mean1": mean_msi.tolist(),
+            "std1": std_msi.tolist(),
+            "mean2": mean_hsi.tolist(),
+            "std2": std_hsi.tolist(),
+            "msi_note": (
+                "10-channel temporal composite: B4,B3,B2,B8,"
+                "B5,B6,B7,B8a,B11,B12"
+            ),
+        })
+        stats_path = Path(args.stats_json) if args.stats_json else root / "normalize_stats_h2sr.json"
+    else:
+        mean_mt = np.mean(np.stack(mt_means), axis=0)
+        std_mt = np.mean(np.stack(mt_stds), axis=0)
+        meta.update({
+            "mt_dates": MT_DATES,
+            "mt_bands": MT_BANDS,
+            "mean_mt": mean_mt.tolist(),
+            "std_mt": std_mt.tolist(),
+            "mean_mt_by_date_band": mean_mt.reshape(MT_DATES, MT_BANDS).tolist(),
+            "std_mt_by_date_band": std_mt.reshape(MT_DATES, MT_BANDS).tolist(),
+        })
+        stats_path = Path(args.stats_json) if args.stats_json else root / "normalize_stats.json"
     with stats_path.open("w", encoding="utf-8") as fh:
         json.dump(meta, fh, indent=2, ensure_ascii=False)
-        fh.write("\n")
+        fh.write(chr(10))
     print(f"C2Seg-style Col_avg over {len(hsi_means)} patches (mask={args.mask})")
     print(f"mean_hsi[:5]={_fmt(mean_hsi[:5])} ... [-5:]={_fmt(mean_hsi[-5:])}")
-    print(f"mean_mt [:5]={_fmt(mean_mt[:5])} ... [-5:]={_fmt(mean_mt[-5:])}")
+    if args.msi:
+        print(f"mean_msi={_fmt(mean_msi)}")
+    else:
+        print(f"mean_mt [:5]={_fmt(mean_mt[:5])} ... [-5:]={_fmt(mean_mt[-5:])}")
     print(f"written: {stats_path}")
     return 0
-
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
@@ -900,6 +1018,24 @@ def build_parser() -> argparse.ArgumentParser:
     build.add_argument("--dry-run", action="store_true", help="print counts/estimate only")
     build.set_defaults(func=cmd_build)
 
+    msi = sub.add_parser("build-msi", help="build the 10-channel MSI composite")
+    msi.add_argument("--patches", type=Path, default=DEFAULT_OUT / "patches.txt")
+    msi.add_argument("--out", type=Path, default=None, help="output root (default: patches parent)")
+    msi.add_argument(
+        "--bands",
+        type=int,
+        nargs=10,
+        default=(2, 1, 0, 6, 3, 4, 5, 7, 8, 9),
+        metavar=("B1", "B2", "B3", "B4", "B5", "B6", "B7", "B8", "B9", "B10"),
+        help="ten 0-based MT band indices (default: B4,B3,B2,B8,B5,B6,B7,B8a,B11,B12)",
+    )
+    msi.add_argument("--reduce", choices=("median", "mean"), default="median")
+    msi.add_argument("--compression", choices=("none", "zlib", "lzw"), default="none")
+    msi.add_argument("--compression-level", type=int, default=1)
+    msi.add_argument("--overwrite", action="store_true")
+    msi.add_argument("--dry-run", action="store_true")
+    msi.set_defaults(func=cmd_build_msi)
+
     verify = sub.add_parser("verify", help="check output shapes/dtypes")
     verify.add_argument("--patches", type=Path, default=DEFAULT_OUT / "patches.txt")
     verify.add_argument("--full", action="store_true", help="also read labels and check values")
@@ -925,6 +1061,11 @@ def build_parser() -> argparse.ArgumentParser:
     stats.add_argument("--lists", nargs="+", type=Path, default=None)
     stats.add_argument("--out", type=Path, default=DEFAULT_OUT, help="default output root")
     stats.add_argument("--mask", choices=("none", "ignore"), default="none")
+    stats.add_argument(
+        "--msi",
+        action="store_true",
+        help="compute 6-channel MSI + HSI stats for Normalize2 (instead of 310-channel MT)",
+    )
     stats.add_argument("--max-samples", type=int, default=None)
     stats.add_argument("--stats-json", type=Path, default=None)
     stats.set_defaults(func=cmd_stats)

@@ -1,0 +1,6 @@
+_base_: 'H2SR.yml'
+
+model:
+  type: UNet
+  in_channels: 259
+  num_classes: 8

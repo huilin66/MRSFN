@@ -1,0 +1,13 @@
+_base_: 'H2SR.yml'
+
+# t1 = [B4,B3,B2,B8,B5,B6,B7,B8a,B11,B12]: 4 MSI + 6 SAR-slot channels.
+
+# MRSN (4B2H)
+model:
+  type: CX_Uper_4B2H
+  backb: convnext_tiny
+  in_channels: 3
+  num_classes: 8
+  dropout_rate: 0
+  hsi_chs: 249
+  sar_chs: 6
