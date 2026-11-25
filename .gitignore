@@ -44,6 +44,7 @@ manuscript/
 *.cff
 
 upload/
+tmp/
 
 # smoke-test experiment artifacts (kept locally, not committed)
 smoke_test/exp01/
