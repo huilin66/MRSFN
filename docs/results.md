@@ -1,9 +1,8 @@
 # Experimental Results
 
-This document records the single-seed BW and AB evaluation results currently
-available for the revised manuscript. Multi-seed repeatability results are
-reserved for a separate section and are not mixed with these single-seed
-tables.
+This document records the single-seed BW, AB, and MDAS evaluation results
+currently available for the revised manuscript. Multi-seed repeatability
+results appear in a separate section.
 
 ## 1. Reporting conventions
 
@@ -49,7 +48,50 @@ tables.
 | MRSN | `cxup_4b2h_AB` | 0.7657 | 0.8625 | 0.8760 | 0.8510 | 117.02M | 25.87G | 43.24 |
 | MRSFN | `cxup_4b_AB_PMRG_v2_lossV2` | 0.7571 | 0.8576 | 0.8905 | 0.8685 | 116.70M | 23.75G | 29.69 |
 
-### 2.3 Baseline interpretation
+### 2.3 MDAS results
+
+The nine formal A100 runs on MDAS (Augsburg) used `mdas_clip` with 14
+classes, 64×64 non-overlapping patches, and a fixed patch-level random
+split of 277 training patches and 31 validation patches (split seed
+`1919810`). All models used training seed `1919810` and completed
+1,700 iterations (100 epochs, batch size 16). Validation ran every
+80 iterations and again at `iter_1700`. Each row reports the metrics
+and profiling values logged at the checkpoint with the highest
+validation mIoU.
+
+| Model | Technical configuration | Best checkpoint iteration | mIoU | F1 | Accuracy | Kappa | Params | FLOPs | FPS |
+|---|---|---|---:|---:|---:|---:|---:|---:|---:|
+| U-Net | `unet_MDAS` | `iter_400` | 0.2709 | 0.3478 | 0.7858 | 0.7206 | 13.55M | 2.55G | 974.00 |
+| DeepLab | `deeplabv3p_MDAS` | `iter_160` | 0.2354 | 0.3142 | 0.7124 | 0.6259 | 26.86M | 1.86G | 477.32 |
+| OCRNet | `ocrnet_MDAS` | `iter_1600` | 0.2353 | 0.3021 | 0.7568 | 0.6787 | 12.26M | 0.98G | 131.97 |
+| SegFormer | `segformer_MDAS` | `iter_480` | 0.2877 | 0.3808 | 0.7640 | 0.6915 | 28.13M | 1.08G | 516.62 |
+| HighDAN | `highdan_MDAS` | `iter_560` | 0.2028 | 0.2533 | 0.7362 | 0.6461 | 16.73M | 10.21G | 245.88 |
+| UpderNet | `upernet_MDAS` | `iter_160` | 0.2490 | 0.3182 | 0.7439 | 0.6709 | 30.21M | 2.03G | 869.76 |
+| CMX (MiT-B4) | `cmx_4b_MDAS` | `iter_240` | 0.2638 | 0.3400 | 0.7645 | 0.6914 | 142.20M | 2.33G | 125.31 |
+| MRSN | `MRSN_MDAS` | `iter_160` | 0.2811 | 0.3635 | 0.7800 | 0.7091 | 117.02M | 6.48G | 284.68 |
+| MRSFN | `MRSFN_MDAS` | `iter_160` | 0.2857 | 0.3694 | 0.7869 | 0.7183 | 116.70M | 5.94G | 262.72 |
+
+SegFormer has the highest validation mIoU (0.2877) and F1 (0.3808).
+MRSFN ranks second in mIoU (0.2857), 0.0046 ahead of MRSN, and has
+the highest accuracy (0.7869). U-Net has the highest Kappa (0.7206).
+These comparisons apply to the single patch-level validation split.
+
+On `A100-1`, the dataset was read from `/data/huilin/data/mdas_clip`.
+The paths below are relative to `/data/huilin/projects/MRSN/`. Each run
+stores its selected weights at `output/mdas/<run>/best_model/model.pdparams`,
+where `<run>` is the corresponding log subdirectory.
+
+- `log/mdas/unet/unet_MDAS_20261124_233837.log`
+- `log/mdas/deeplabv3p/deeplabv3p_MDAS_20261124_234258.log`
+- `log/mdas/ocrnet/ocrnet_MDAS_20261124_234721.log`
+- `log/mdas/segformer/segformer_MDAS_20261124_235436.log`
+- `log/mdas/highdan/highdan_MDAS_20261124_235837.log`
+- `log/mdas/upernet/upernet_MDAS_20261125_002030.log`
+- `log/mdas/cmx/cmx_4b_MDAS_20261125_000614.log`
+- `log/mdas/mrsn/MRSN_MDAS_20261125_002535.log`
+- `log/mdas/mrsfn/MRSFN_MDAS_20261125_003426.log`
+
+### 2.4 Baseline interpretation
 
 - In BW, MRSFN exceeds the legacy MRSN by `+0.0035` mIoU.
 - In AB, MRSN exceeds MRSFN by `+0.0086` mIoU.
@@ -59,7 +101,7 @@ tables.
   EXP-03 repeatability set.
 - MRSN is the legacy structure; MRSFN is the final proposed model.
 
-### 2.4 CMX provenance
+### 2.5 CMX provenance
 
 CMX uses MiT-B4 in both input streams and was trained once with seed
 `1919810`. The baseline rows report the best-validation checkpoints:
