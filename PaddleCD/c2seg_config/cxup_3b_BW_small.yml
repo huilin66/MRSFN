@@ -1,0 +1,11 @@
+_base_: 'C2Seg_BW.yml'
+
+# EXP-02 supplemental run: retain the 3B branch design while using
+# ConvNeXt-Small to test the branch-count/capacity interaction.
+model:
+  type: CX_Uper_3B
+  backb: convnext_small
+  in_channels: 3
+  num_classes: 14
+  dropout_rate: 0
+  hsi_chs: 116

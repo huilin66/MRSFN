@@ -130,9 +130,15 @@ class CX_Uper_2B(nn.Layer):
         elif backb == 'convnext_small':
             self.backbone1 = convnext.convnext_small(in_chans=6)
             self.backbone2 = convnext.convnext_small(in_chans=hsi_chs)
-        else:
+        elif backb == 'convnext_base':
             self.backbone1 = convnext.convnext_base(in_chans=6)
             self.backbone2 = convnext.convnext_base(in_chans=hsi_chs)
+        elif backb == 'convnext_large':
+            self.backbone1 = convnext.convnext_large(in_chans=6)
+            self.backbone2 = convnext.convnext_large(in_chans=hsi_chs)
+        else:
+            raise ValueError(
+                "Unsupported 2-branch ConvNeXt backbone: {}".format(backb))
 
         self.decode_head = UPerHead_2B(self.backbone1.dims[:3], num_classes=num_classes)
         self.drop = nn.Dropout2D(dropout_rate)
