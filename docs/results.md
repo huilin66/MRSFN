@@ -1,8 +1,8 @@
 # Experimental Results
 
-This document records the single-seed BW, AB, and MDAS evaluation results
-currently available for the revised manuscript. Multi-seed repeatability
-results appear in a separate section.
+This document records the single-seed BW, AB, MDAS, and H2SR evaluation
+results currently available for the revised manuscript. Multi-seed
+repeatability results appear in a separate section.
 
 ## 1. Reporting conventions
 
@@ -91,7 +91,49 @@ where `<run>` is the corresponding log subdirectory.
 - `log/mdas/mrsn/MRSN_MDAS_20261125_002535.log`
 - `log/mdas/mrsfn/MRSFN_MDAS_20261125_003426.log`
 
-### 2.4 Baseline interpretation
+### 2.4 H2SR results
+
+The nine formal A100 runs used WHU-H2SR-MT with eight classes and
+128×128 patches. The fixed block-wise split used 2,281 training patches
+and held out block 8 for validation (250 patches). All models used
+training seed `1919810` and completed 28,500 iterations (100 epochs,
+batch size 8). Validation ran every 1,000 iterations and at `iter_28500`.
+Each row reports the metrics and profiling values logged at the checkpoint
+with the highest validation mIoU.
+
+| Model | Technical configuration | Best checkpoint iteration | mIoU | F1 | Accuracy | Kappa | Params | FLOPs | FPS |
+|---|---|---|---:|---:|---:|---:|---:|---:|---:|
+| U-Net | `unet_H2SR` | `iter_6000` | 0.5816 | 0.6929 | 0.8932 | 0.8442 | 13.56M | 10.24G | 376.06 |
+| DeepLab | `deeplabv3p_H2SR` | `iter_12000` | 0.5767 | 0.6931 | 0.8939 | 0.8442 | 26.87M | 7.44G | 244.44 |
+| OCRNet | `ocrnet_H2SR` | `iter_24000` | 0.5749 | 0.6911 | 0.8931 | 0.8434 | 12.26M | 3.92G | 112.92 |
+| SegFormer | `segformer_H2SR` | `iter_7000` | 0.5852 | 0.7037 | 0.8933 | 0.8446 | 28.16M | 4.37G | 290.03 |
+| HighDAN | `highdan_H2SR` | `iter_13000` | 0.5720 | 0.6812 | 0.8916 | 0.8407 | 16.73M | 40.86G | 121.25 |
+| UpderNet | `upernet_H2SR` | `iter_3000` | 0.5822 | 0.6964 | 0.8956 | 0.8474 | 30.22M | 8.14G | 374.57 |
+| CMX (MiT-B4) | `cmx_4b_H2SR` | `iter_7000` | 0.5644 | 0.6832 | 0.8855 | 0.8336 | 142.23M | 9.34G | 85.06 |
+| MRSN | `MRSN_H2SR` | `iter_3000` | 0.5855 | 0.6996 | 0.8951 | 0.8467 | 117.03M | 25.88G | 149.99 |
+| MRSFN | `MRSFN_H2SR` | `iter_10000` | 0.5827 | 0.6935 | 0.8966 | 0.8490 | 116.72M | 23.76G | 142.95 |
+
+MRSN has the highest validation mIoU (0.5855), followed by SegFormer
+(0.5852) and MRSFN (0.5827). SegFormer has the highest F1 (0.7037),
+while MRSFN has the highest accuracy (0.8966) and Kappa (0.8490).
+These results are from one training seed and one held-out block.
+
+On `A100-1`, the dataset was read from `/data/huilin/data/WHU_H2SR_MT_128`.
+The paths below are relative to `/data/huilin/projects/MRSN/`. The selected
+weights are stored at `output/h2sr/<run>/best_model/model.pdparams`,
+where `<run>` is the corresponding log subdirectory.
+
+- `log/h2sr/unet/unet_H2SR_20261125_212644.log`
+- `log/h2sr/deeplabv3p/deeplabv3p_H2SR_20261125_224836.log`
+- `log/h2sr/ocrnet/ocrnet_H2SR_20261126_001208.log`
+- `log/h2sr/segformer/segformer_H2SR_20261126_014638.log`
+- `log/h2sr/highdan/highdan_H2SR_20261126_030706.log`
+- `log/h2sr/upernet/upernet_H2SR_20261126_070859.log`
+- `log/h2sr/cmx/cmx_4b_H2SR_20261126_044901.log`
+- `log/h2sr/mrsn/MRSN_H2SR_20261126_084722.log`
+- `log/h2sr/mrsfn/MRSFN_H2SR_20261126_101530.log`
+
+### 2.5 Baseline interpretation
 
 - In BW, MRSFN exceeds the legacy MRSN by `+0.0035` mIoU.
 - In AB, MRSN exceeds MRSFN by `+0.0086` mIoU.
@@ -101,7 +143,7 @@ where `<run>` is the corresponding log subdirectory.
   EXP-03 repeatability set.
 - MRSN is the legacy structure; MRSFN is the final proposed model.
 
-### 2.5 CMX provenance
+### 2.6 CMX provenance
 
 CMX uses MiT-B4 in both input streams and was trained once with seed
 `1919810`. The baseline rows report the best-validation checkpoints:
