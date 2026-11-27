@@ -509,3 +509,47 @@ the city-disjoint results above.
 - `MRSFN`: final proposed model (`4B + PMRG + ML`), represented by
   `cxup_4b_BW_PMRG_v2_lossV2` and `cxup_4b_AB_PMRG_v2_lossV2`.
 
+## 100. Results trace
+
+This section indexes the figures and tables in the IEEE manuscript
+(`ieee_version/main.tex` in the manuscript repository) by LaTeX label.
+Figure filenames are relative to `ieee_version/pic/`. Server artifact paths
+are relative to `/data/huilin/projects/MRSN/` on `A100-1`.
+
+### 100.1 Figures
+
+| Manuscript label | Manuscript image | Generation code and provenance |
+|---|---|---|
+| `fig:qualitative_comparison` | `pred_comparison.png` | [Collect BW samples](../tools/collect_top_miou_samples.py), [record box annotations](../tools/annotate_boxes.py), and [assemble the comparison](../tools/make_comparison_figure.py). The final sample list and box coordinates have not been verified. |
+| `fig:source_tif_prediction` | `source_tif_pred_BW_wuhan.png` | [Full-scene inference](../tools/infer_full_scene.py) and [comparison assembly](../tools/make_full_scene_comparison_figure.py), dataset `BW`, scene `wuhan`. Final rendering arguments are unverified. |
+| `fig:source_tif_prediction_beijing` | `source_tif_pred_BW_beijing.png` | The same full-scene scripts, dataset `BW`, scene `beijing`. Final rendering arguments are unverified. |
+| `fig:source_tif_prediction_augsburg` | `source_tif_pred_AB_augsburg.png` | The same full-scene scripts, dataset `AB`, scene `augsburg`. Final rendering arguments are unverified. |
+| `fig:source_tif_prediction_berlin` | `source_tif_pred_AB_berlin.png` | The same full-scene scripts, dataset `AB`, scene `berlin`. Final rendering arguments are unverified. |
+| `fig:cam_visualization` | `cam_comparison.png` | [Compute CAMs](../tools/cam_analysis.py), [collect panels](../tools/cam_collect_vis.py), and [assemble the comparison](../tools/make_cam_comparison_figure.py). The final sample and target-class combinations are unverified. |
+| `fig:tsne_gt_prototype` | `tsne_gt_unet.png`, `tsne_gt_upernet.png`, `tsne_gt_mrsn.png`, `tsne_gt_mrsfn.png` | [GT prototype t-SNE](../tools/tsne_prototype_analysis.py). A100 stores `tsne_gt_by_class.png` and `tsne_meta.json` in `ana/<run>/prototype_tsne/` for `unet_BW`, `cxup_1b_BW`, `cxup_4b2h_BW`, and `cxup_4b_BW_PMRG_v2_lossV2`, respectively. The server PNG hashes differ from the manuscript PNG hashes. The final image processing is unverified. |
+| `fig:framework` | `framework.png` | Architecture diagram. The PNG is in the manuscript repository, and the editable source or generation code has not been located. |
+| `fig:PMRG` | `PMRG.png` | PMRG architecture diagram. The PNG is in the manuscript repository, and the editable source or generation code has not been located. |
+
+### 100.2 Tables
+
+The final LaTeX tables are in `ieee_version/main.tex`. The entries below trace
+the measurements and summaries used to populate them.
+
+| Manuscript label | Result | Code and source artifacts |
+|---|---|---|
+| `tab:main_results` | C2Seg-BW baseline comparison | [Validation entry point](../PaddleCD/val.py), [log summary tool](../tools/logs_summary.py), and [Section 2.1](#21-bw-results). BW checkpoints and validation logs are documented in Section 1, with CMX provenance in Section 2.6. See the FPS provenance below. |
+| `tab:main_results_ab` | C2Seg-AB baseline comparison | The same validation and log summary tools. See [Section 2.2](#22-ab-results) and the AB log and checkpoint sources in Sections 1 and 2.6. See the FPS provenance below. |
+| `tab:supplementary_datasets` | MDAS and WHU-H2SR-MT | [MDAS launcher](../exp_mdas.sh) and [H2SR launcher](../exp_h2sr.sh). [Section 2.3](#23-mdas-results) and [Section 2.4](#24-h2sr-results) list the A100 logs and selected checkpoints. Each row uses the validation evaluation at the highest mIoU. |
+| `tab:ablation` | Three-seed MBB, PMRG, and ML ablation | [EXP-03 launcher](../scripts/exp03_repeatability.sh) and [three-seed summary](../tools/summarize_exp03.py). See [Section 5](#5-exp-03-repeatability) for seed-level provenance. See the FPS provenance below. |
+| `tab:backbone_capacity` | Backbone capacity and MSI grouping | [EXP-02 capacity control](../scripts/exp02_capacity_control.sh) and [EXP-06 MSI branch control](../scripts/exp06_msi_branch_control.sh). See [Section 4](#4-exp-02-backbone-and-capacity-comparison) and [Section 7](#7-exp-06-msi-branch-control). See the FPS provenance below. |
+| `tab:per_class_iou` | BW class-wise IoU | [Validation core](../PaddleCD/paddleseg/core/val.py) logs class IoU. [IoU summary utility](../tools/ana_iou_summary.py) can also aggregate class IoU. The original extraction command for the manuscript table is unverified. |
+| `tab:geographic_independence` | Beijing training, Wuhan validation | [City split builder](../tools/build_city_split_dataset.py), [EXP-01 launcher](../scripts/exp01_city_all_models.sh), and [Section 8.2](#82-city-split-results). |
+| `tab:pmrg_evidence` | Three-seed PMRG modality perturbation | [EXP-04 launcher](../scripts/exp04_pmrg_evidence.sh) and [evaluation and CSV export](../tools/eval_exp04_pmrg_evidence.py). See [Section 6](#6-exp-04-pmrg-evidence-experiment). See `ana/exp04_repeat/` for matched controls and `ana/exp04_repeat_mrsfn/` for the final-model extension. |
+
+The unified FPS benchmark is available in Git commit `c01275e` as
+`PaddleCD/benchmark_efficiency.py` and `scripts/exp12_efficiency_benchmark.sh`.
+Commit `c3ff3f4` records a later benchmark summary in `docs/results.md` and
+includes the manuscript's BW UNet value of `256.39 ± 8.69` FPS. The CSV in
+`c01275e` contains a different run. The supplementary MDAS and H2SR table in
+the manuscript reports validation accuracy metrics only.
+
