@@ -218,13 +218,13 @@ a parameter-matched causal comparison.
 | Configuration | Backbone | Technical configuration | mIoU | F1 | Accuracy | Kappa | Params | FLOPs | FPS |
 |---|---|---|---:|---:|---:|---:|---:|---:|---:|
 | 1B / UpderNet | ConvNeXt-Tiny | `cxup_1b_BW` | 0.8025 | 0.8878 | 0.9328 | 0.9094 | 30.01M | 31.70G | 143.93 |
-| 2B | ConvNeXt-Tiny | `cxup_2b_BW` | 0.8342 | 0.9079 | 0.9470 | 0.9286 | 58.50M | 51.71G | 104.47 |
-| 3B | ConvNeXt-Tiny | `cxup_3b_BW` | 0.8496 | 0.9173 | 0.9537 | 0.9377 | 87.00M | 71.73G | 85.27 |
-| 4B | ConvNeXt-Tiny | `cxup_4b_BW` | 0.8659 | 0.9269 | 0.9598 | 0.9459 | 115.49M | 91.76G | 49.96 |
 | 1B + larger backbone | ConvNeXt-Small | `cxup_1b_BW_small_exp02` | 0.8203 | 0.8993 | 0.9410 | 0.9204 | 51.65M | 53.80G | 64.78 |
 | 1B + larger backbone | ConvNeXt-Base | `cxup_1b_BW_base_exp02` | 0.8301 | 0.9054 | 0.9454 | 0.9264 | 90.05M | 86.07G | 45.12 |
 | 1B + larger backbone | ConvNeXt-Large | `cxup_1b_BW_large_exp02` | 0.8379 | 0.9103 | 0.9493 | 0.9316 | 199.28M | 177.61G | 54.33 |
+| 2B | ConvNeXt-Tiny | `cxup_2b_BW` | 0.8342 | 0.9079 | 0.9470 | 0.9286 | 58.50M | 51.71G | 104.47 |
 | 2B + larger backbone | ConvNeXt-Small | `cxup_2b_BW_small_exp02` | 0.8460 | 0.9151 | 0.9520 | 0.9353 | 101.77M | 95.91G | 66.55 |
+| 3B | ConvNeXt-Tiny | `cxup_3b_BW` | 0.8496 | 0.9173 | 0.9537 | 0.9377 | 87.00M | 71.73G | 85.27 |
+| 4B | ConvNeXt-Tiny | `cxup_4b_BW` | 0.8659 | 0.9269 | 0.9598 | 0.9459 | 115.49M | 91.76G | 49.96 |
 
 The 1B-Large model has substantially more parameters and FLOPs than 4B-Tiny
 but remains lower in mIoU (0.8379 versus 0.8659). The 2B-Small model reaches
